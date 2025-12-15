@@ -1,137 +1,121 @@
-// app.js - Full CRUD API, Static File Server, and External Image Fetching
-
 const express = require('express');
-const mysql = require('mysql2'); 
-const fetch = require('node-fetch'); // Required for making external API calls
-const app = express();
-const port = 3000; 
+const mysql = require('mysql2/promise');
+const fetch = require('node-fetch');
+const path = require('path');
 
-// --- 1. MySQL Connection Configuration ---
-const dbConfig = {
+const app = express();
+const port = 3000;
+
+// --- Database Configuration (VERIFY THESE AGAIN) ---
+const pool = mysql.createPool({
     host: 'localhost',
     user: 'root', 
-    password: '', 
-    database: 'nodejsproj_db' // !!! CONFIRM YOUR DATABASE NAME HERE !!!
-};
-// Create connection pool and immediately promisify it for async/await syntax
-const pool = mysql.createPool(dbConfig).promise(); 
+    password: '', // CONFIRMED: Use your actual password or ''
+    database: 'nodejsproj_db', // CONFIRMED: Use your actual database name
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
 
-// --- 2. Middleware & Static Files ---
-app.use(express.json()); // To parse JSON bodies (for POST/PUT/PATCH)
-app.use(express.urlencoded({ extended: true })); 
-app.use(express.static('public')); // Serve all frontend files from the 'public' directory
+// --- Middleware ---
+app.use(express.json()); 
+app.use(express.static(path.join(__dirname, 'public'))); 
 
-// --- 3. Test Database Connection on Startup ---
-async function testDbConnection() {
-    try {
-        const connection = await pool.getConnection();
-        console.log('Successfully connected to MySQL as id ' + connection.threadId);
-        connection.release();
-    } catch (err) {
-        console.error('Error connecting to MySQL:', err.stack);
-        console.error('ACTION REQUIRED: Ensure MySQL in XAMPP is running and database name is correct.');
-    }
-}
-testDbConnection();
+// Serve the index.html file
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-
-// ------------------------------------------------------------------
-// --- 4. CRUD API Routes (All parameterized for security) ---
-// ------------------------------------------------------------------
-
-
-// R - READ ALL CATS (Optional: Filter by Query Parameter ?id=X)
+// R - READ (GET) all cats with Search and Pagination
+// R - READ (GET) all cats with Search and Pagination
 app.get('/cats', async (req, res) => {
-    const queryId = req.query.id; 
-    let sql;
-    let params = [];
+    // 1. Get Parameters and Defaults
+    const limit = parseInt(req.query.limit) || 8; 
+    const page = parseInt(req.query.page) || 1;
+    // Use .toString() to be safe, then trim.
+    const search = req.query.search ? req.query.search.toString().trim() : ''; 
 
-    if (queryId) {
-        sql = 'SELECT * FROM cats WHERE id = ?';
-        params = [queryId];
-    } else {
-        sql = 'SELECT * FROM cats';
+    const offset = (page - 1) * limit;
+    
+    const responseData = {
+        cats: [], totalCount: 0, totalPages: 0, currentPage: page, limit: limit
+    };
+
+    let whereClause = '';
+    let searchParams = [];
+
+    // 2. Build Search (WHERE) Clause ONLY IF search is non-empty
+    if (search.length > 0) { // Check length > 0 for explicit safety
+        whereClause = ' WHERE name LIKE ? OR tag LIKE ? OR descreption LIKE ?';
+        const searchTerm = `%${search}%`;
+        searchParams = [searchTerm, searchTerm, searchTerm];
     }
 
     try {
-        const [results] = await pool.execute(sql, params); 
-        if (queryId && results.length === 0) {
-            return res.status(404).json({ error: `Cat not found with ID ${queryId}.` });
-        }
-        res.json(results);
+        // --- Query 1: Get Total Count (uses searchParams only) ---
+        const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
+        const [countRows] = await pool.execute(countSql, searchParams);
+        
+        responseData.totalCount = countRows[0].total_count;
+        responseData.totalPages = Math.ceil(responseData.totalCount / limit);
+
+        // --- Query 2: Get Cats Data (uses searchParams PLUS LIMIT/OFFSET) ---
+        // If whereClause is empty, the SQL is: SELECT * FROM cats ORDER BY id DESC LIMIT ? OFFSET ?
+        const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
+        
+        const catsParams = [...searchParams, limit, offset];
+        
+        console.log(`[SQL TRACE] Executing Query with ${catsParams.length} parameters.`);
+        console.log(`[SQL TRACE] Search: "${search}", Limit: ${limit}, Offset: ${offset}`);
+
+        const [catsRows] = await pool.execute(catsSql, catsParams);
+        responseData.cats = catsRows;
+
+        res.json(responseData);
+
     } catch (err) {
-        console.error('Database query error:', err);
-        return res.status(500).json({ error: 'Error fetching cat data.' });
+        // CRITICAL: LOG THE ERROR to help you debug the final issue.
+        console.error('--- CRITICAL SQL ERROR ---');
+        console.error(`Error Message: ${err.message}`);
+        return res.status(500).json({ error: 'Database error fetching cats.' });
     }
 });
 
-
-// R - READ ONE CAT by Path Parameter
-app.get('/cats/:id', async (req, res) => {
-    const catId = req.params.id; 
-    try {
-        const [results] = await pool.execute('SELECT * FROM cats WHERE id = ?', [catId]);
-        if (results.length === 0) {
-            return res.status(404).json({ error: 'Cat not found.' });
-        }
-        res.json(results[0]); 
-    } catch (err) {
-        console.error('Database query error:', err);
-        return res.status(500).json({ error: 'Error fetching single cat data.' });
-    }
-});
-
-
-// C - CREATE (POST) a new cat (Includes External Image Fetching)
+// C - CREATE (POST) a new cat (Handles Optional Image URL)
 app.post('/cats', async (req, res) => {
-    // Get data from the request body
-    const { name, tag, descreption } = req.body; 
+    const { name, tag, descreption, img } = req.body; // Extract img here
     
     if (!name || !tag) {
         return res.status(400).json({ error: 'Name and Tag are required fields.' });
     }
     
-    let imageUrl = req.body.img; 
+    let imageUrl = img; // Start with the provided img URL
 
     try {
-        // --- STEP 1: Fetch Unique Image URL from External API (Cataas) ---
+        // Only fetch a random image if NO URL was provided by the user
         if (!imageUrl || imageUrl.trim() === '') {
             const cataasBaseUrl = 'https://cataas.com/cat'; 
-            
-            // 🛑 CACHE-BUSTING FIX: Append a unique timestamp to force a new image
             const uniqueUrl = `${cataasBaseUrl}?_ts=${Date.now()}`;
             
-            console.log('Fetching unique image with URL:', uniqueUrl);
-
+            // Logic to fetch a random image from Cataas
             const imageResponse = await fetch(uniqueUrl, { redirect: 'manual' });
             
             if (imageResponse.status === 302 || imageResponse.status === 307) {
-                // If it's a redirect, get the actual URL from the 'Location' header
                 imageUrl = imageResponse.headers.get('location');
             } else if (imageResponse.ok && imageResponse.url) {
-                // If it returns a 200 OK directly, use the final URL
                 imageUrl = imageResponse.url;
             } else {
-                console.error(`Cataas API response status: ${imageResponse.status}`);
-                imageUrl = 'default_placeholder.jpg'; 
+                imageUrl = '/placeholder.jpg';
             }
         }
         
-        if (!imageUrl) {
-             imageUrl = 'default_placeholder.jpg';
-        }
+        if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
 
-        // --- STEP 2: Insert Data into MySQL ---
+        // Insert into database using the CONFIRMED spelling 'descreption'
         const sql = 'INSERT INTO cats (name, tag, descreption, img) VALUES (?, ?, ?, ?)';
-        
         const [result] = await pool.execute(sql, [name, tag, descreption, imageUrl]);
 
-        // 3. Success: Return the newly created record's ID
-        res.status(201).json({ 
-            message: 'Cat successfully created with external image.',
-            id: result.insertId,
-            data: { name, tag, descreption, img: imageUrl }
-        });
+        res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
 
     } catch (err) {
         console.error('Database insertion error or Image fetch error:', err);
@@ -140,93 +124,66 @@ app.post('/cats', async (req, res) => {
 });
 
 
-// U - UPDATE (PUT) an existing cat (Full Replacement)
+// U - UPDATE (PUT) a cat by ID (Handles Image URL Update)
 app.put('/cats/:id', async (req, res) => {
-    const catId = req.params.id;
-    const { name, tag, descreption, img } = req.body;
+    const { id } = req.params;
+    const { name, tag, descreption, img } = req.body; // Extract img here
+    
     if (!name || !tag) {
-        return res.status(400).json({ error: 'Name and Tag are required fields for update.' });
+        return res.status(400).json({ error: 'Name and Tag are required fields.' });
     }
-    try {
-        const sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ? WHERE id = ?';
-        const [result] = await pool.execute(sql, [name, tag, descreption, img, catId]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: `Cat with ID ${catId} not found.` });
-        }
-        res.status(200).json({ 
-            message: `Cat with ID ${catId} successfully updated.`,
-            updatedCount: result.affectedRows
-        });
-    } catch (err) {
-        console.error('Database update error:', err);
-        return res.status(500).json({ error: 'Error updating cat.' });
-    }
-});
-
-
-// P - PATCH (Partial Update) an existing cat
-app.patch('/cats/:id', async (req, res) => {
-    const catId = req.params.id;
-    const updates = req.body; 
-    let updateFields = [];
-    let params = [];
-
-    for (const key in updates) {
-        if (key !== 'id' && updates[key] !== undefined) {
-            updateFields.push(`${key} = ?`);
-            params.push(updates[key]);
-        }
-    }
-    if (updateFields.length === 0) {
-        return res.status(400).json({ error: 'No valid fields provided for update.' });
-    }
-    params.push(catId); 
 
     try {
-        const sql = `UPDATE cats SET ${updateFields.join(', ')} WHERE id = ?`;
+        let sql;
+        let params;
+        
+        // If the user provided a new image URL, update the 'img' column too
+        if (img && img.trim() !== '') {
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ? WHERE id = ?';
+            params = [name, tag, descreption, img, id];
+        } else {
+            // Otherwise, only update the text fields
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ? WHERE id = ?';
+            params = [name, tag, descreption, id];
+        }
+
         const [result] = await pool.execute(sql, params);
 
         if (result.affectedRows === 0) {
-            const [check] = await pool.execute('SELECT id FROM cats WHERE id = ?', [catId]);
-            if (check.length === 0) {
-                return res.status(404).json({ error: `Cat with ID ${catId} not found.` });
-            }
-            return res.status(200).json({ message: `Cat with ID ${catId} found, but no changes were applied.` });
+            return res.status(404).json({ message: 'Cat not found.' });
         }
-        res.status(200).json({ 
-            message: `Cat with ID ${catId} successfully patched.`,
-            updatedCount: result.affectedRows
-        });
+
+        res.json({ message: 'Cat updated successfully.' });
+
     } catch (err) {
-        console.error('Database PATCH error:', err);
-        return res.status(500).json({ error: 'Error patching cat.' });
+        console.error('Database update error:', err);
+        res.status(500).json({ error: 'Error updating cat.' });
     }
 });
 
 
-// D - DELETE a cat by ID
+// D - DELETE (DELETE) a cat by ID
 app.delete('/cats/:id', async (req, res) => {
-    const catId = req.params.id; 
+    const { id } = req.params;
+
     try {
-        const [result] = await pool.execute('DELETE FROM cats WHERE id = ?', [catId]);
+        const sql = 'DELETE FROM cats WHERE id = ?';
+        const [result] = await pool.execute(sql, [id]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: `Cat not found with ID ${catId}. No record was deleted.` });
+            return res.status(404).json({ message: 'Cat not found.' });
         }
-        res.status(200).json({ 
-            message: `Cat with ID ${catId} successfully deleted.`,
-            deletedCount: result.affectedRows
-        }); 
+
+        res.json({ message: 'Cat deleted successfully.' });
+
     } catch (err) {
-        console.error('Database deletion error:', err);
-        return res.status(500).json({ error: 'Error processing deletion request.' });
+        console.error('Database delete error:', err);
+        res.status(500).json({ error: 'Error deleting cat.' });
     }
 });
 
 
-// --- 5. Start Express Server ---
+// --- Server Start ---
 app.listen(port, () => {
-    console.log(`Express server listening on port ${port}`);
-    console.log(`Access the web app at http://localhost:${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });
