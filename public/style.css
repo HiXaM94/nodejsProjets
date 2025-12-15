@@ -1,0 +1,157 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #ffffff; /* White background */
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+}
+
+header {
+    /* Mimics the top bar in your screenshot */
+    background-color: #f8f8f8; 
+    border-bottom: 1px solid #eee;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 {
+    font-size: 18px;
+    font-weight: normal;
+    margin: 0;
+}
+
+#addCatBtn {
+    /* Matches the 'Add Cat' button style and placement */
+    padding: 5px 15px;
+    background-color: #fff;
+    color: #333;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.gallery-container {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 20px;
+    gap: 30px; /* Space between cards */
+}
+
+.cat-card {
+    background-color: white;
+    /* Mimics the slight shadow/border effect in the screenshot */
+    border: 1px solid #eee;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
+    width: 250px; /* Adjusted card width */
+    overflow: hidden;
+    padding-bottom: 10px; /* Padding for the bottom section */
+}
+
+.cat-card img {
+    /* Image section style */
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    margin-bottom: 5px;
+}
+
+.cat-info {
+    padding: 0 10px;
+}
+
+.cat-info h3 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+.cat-info p {
+    font-size: 12px;
+    color: #555;
+    margin: 0 0 10px 0;
+}
+
+.tag-box {
+    /* Style for the grey tag box */
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    padding: 5px 10px;
+    font-size: 11px;
+    color: #444;
+    margin-bottom: 15px;
+}
+
+.actions {
+    display: flex;
+    gap: 5px;
+}
+
+.actions button {
+    padding: 5px 10px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 11px;
+    background-color: #f9f9f9;
+    color: #333;
+}
+
+/* Modal Styling */
+.modal {
+    display: none; 
+    position: fixed;
+    z-index: 100; /* Ensure it's on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto; 
+    padding: 15px;
+    border: 1px solid #888;
+    width: 80%; 
+    max-width: 350px; /* Smaller modal size */
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content label, .modal-content input, .modal-content textarea {
+    display: block;
+    width: 95%;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+
+.modal-content input[type="text"], .modal-content textarea {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.save-btn {
+    /* Matches the 'Save Btn' style in the modal */
+    padding: 8px 20px;
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    cursor: pointer;
+    float: right;
+    margin-top: 15px;
+    border-radius: 3px;
+}

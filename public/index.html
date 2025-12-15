@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cats Gallery CRUD App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Cats Galery :</h1>
+        <button id="addCatBtn" onclick="openAddModal()">Add Cat</button>
+    </header>
+
+    <main id="cats-gallery" class="gallery-container">
+        <p id="loading-message">Loading cats data...</p>
+    </main>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">Add (Calen-g000)/cats</h2> 
+            
+            <form id="cat-form">
+                <input type="hidden" id="cat-id">
+                
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required><br>
+
+                <label for="tag">Tag:</label>
+                <input type="text" id="tag" name="tag" required><br>
+
+                <label for="descreption">Description:</label>
+                <input type="text" id="descreption" name="descreption" placeholder="descreption"><br>
+
+                <label for="img">img Filename:</label>
+                <input type="text" id="img" name="img" placeholder="e.g., tabby.jpg or URL"><br>
+
+                <button type="submit" id="save-btn" class="save-btn">Save Btn</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
