@@ -286,3 +286,136 @@ h1 {
 .save-btn:hover {
     background-color: #3a7bc8;
 }
+
+/* --- Tag Filter Dropdown Styling (New) --- */
+
+.filter-row-wrapper {
+    /* Container to hold the filter and center it */
+    background-color: #ffffff; 
+    padding: 10px 0 20px 0; 
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: center;
+}
+
+.filter-container {
+    width: 100%;
+    max-width: 650px; 
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.filter-container label {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+#tagFilterSelect {
+    padding: 8px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px; 
+    font-size: 16px;
+    box-sizing: border-box;
+    cursor: pointer;
+    background-color: #fff;
+    transition: border-color 0.2s;
+}
+
+#tagFilterSelect:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* --- 1. NEW MAIN CONTAINER: CENTERS AND SPACES THE CONTROLS --- */
+.search-filter-controls {
+    /* Use flexbox for horizontal alignment */
+    display: flex;
+    /* Center the contents (search and filter) */
+    justify-content: center; 
+    align-items: center; 
+    
+    /* Set max width to control how wide the controls can spread */
+    max-width: 850px; 
+    /* CRITICAL: Center the control block itself on the page */
+    margin: 0 auto 20px auto; 
+    
+    gap: 30px; /* Space between the search and filter elements */
+    padding: 20px 10px; /* Add slight padding on sides */
+    border-bottom: 1px solid var(--border-soft);
+    flex-wrap: wrap; 
+}
+
+/* --- 2. ADJUST SEARCH BAR CONTAINER --- */
+.search-row-wrapper {
+    /* Allow it to grow larger than the filter */
+    flex-grow: 1; 
+    /* Ensure a minimum width so the placeholder fits */
+    min-width: 250px; 
+    max-width: 500px; 
+    /* Remove any inner padding/margins */
+    padding: 0;
+    margin: 0;
+}
+
+/* Make sure the input element fills its container */
+#searchInput {
+    width: 500px;
+    box-sizing: border-box; 
+}
+
+/* --- 3. ADJUST FILTER CONTAINER --- */
+.filter-row-wrapper {
+    /* Set a fixed size to prevent it from growing and remove redundant styles */
+    flex-shrink: 0; 
+    padding: 0;
+    margin: 0;
+    border-bottom: none; 
+}
+
+.filter-container {
+    /* Keep the label and select aligned */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #f5f5f5;
+}
+
+/* --- Authentication Modal Styling --- */
+.auth-toggle {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.auth-toggle button {
+    padding: 10px 20px;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.auth-toggle button:hover {
+    background-color: #e0e0e0;
+}
+
+.auth-toggle button.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+#authModal form h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+#authModal .message {
+    margin-top: 15px;
+    font-weight: bold;
+    color: green; /* For success messages */
+}

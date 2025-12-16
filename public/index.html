@@ -1,24 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cats Galery</title>
     <link rel="stylesheet" href="/style.css">
-    </head>
+</head>
+
 <body>
 
-    <header>
-        <h1>Cats Galery</h1>
-        <button id="addCatBtn">Add Cat</button>
-    </header>
+   <header class="app-header">
+    <h1>Cats Gallery</h1>
+    <div>
+        <button id="loginBtn" class="btn primary">Login / Register</button>
+        <button id="addCatBtn" class="btn primary">Add Cat</button>
+    </div>
+</header>
 
+ <div class="search-filter-controls">
+    
     <div class="search-row-wrapper">
-        <div class="search-bar-container">
-            <input type="text" id="searchInput" placeholder="Search by name, tag, or description..." />
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search by name, tag, or description...">
         </div>
     </div>
     
+    <div class="filter-row-wrapper">
+        <div class="filter-container">
+            <label for="tagFilterSelect">Filter by Tag:</label>
+            <select id="tagFilterSelect">
+                <option value="">-- Show All Tags --</option>
+                </select>
+        </div>
+    </div>
+
+</div>
+
     <div id="pagination-wrapper">
         <div id="pagination" class="pagination-controls" style="display: none;">
             <button id="prevPageBtn" disabled>&laquo; Previous</button>
@@ -26,9 +44,9 @@
             <button id="nextPageBtn" disabled>Next &raquo;</button>
         </div>
     </div>
-    
+
     <div id="gallery" class="gallery-container">
-        </div>
+    </div>
 
     <div id="catModal" class="modal">
         <div class="modal-content">
@@ -36,7 +54,7 @@
             <h2 id="modalTitle">Add New Cat</h2>
             <form id="catForm">
                 <input type="hidden" id="catId" value="">
-                
+
                 <label for="catName">Name</label>
                 <input type="text" id="catName" name="name" required>
 
@@ -45,15 +63,53 @@
 
                 <label for="catDescreption">Description</label>
                 <textarea id="catDescreption" name="descreption" rows="3"></textarea>
-                
+
                 <label for="catImgUrl">Image URL (Optional)</label>
-                <input type="text" id="catImgUrl" name="img" placeholder="Paste image URL here or leave blank for random image">
+                <input type="text" id="catImgUrl" name="img"
+                    placeholder="Paste image URL here or leave blank for random image">
 
                 <button type="submit" class="save-btn">Save Cat</button>
             </form>
         </div>
     </div>
+    <div id="authModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="document.getElementById('authModal').style.display='none'">&times;</span>
+        
+        <h2>User Authentication</h2>
+
+        <div class="auth-toggle">
+            <button id="showLoginBtn" class="active">Sign In</button>
+            <button id="showRegisterBtn">Register</button>
+        </div>
+
+        <form id="registerForm" style="display: none;">
+            <h3>Create Account</h3>
+            <label for="regUsername">Username:</label>
+            <input type="text" id="regUsername" name="username" required>
+
+            <label for="regPassword">Password:</label>
+            <input type="password" id="regPassword" name="password" required>
+
+            <button type="submit" class="btn primary">Register</button>
+            <p id="registerMessage" class="message"></p>
+        </form>
+
+        <form id="loginForm">
+            <h3>Access Account</h3>
+            <label for="loginUsername">Username:</label>
+            <input type="text" id="loginUsername" name="username" required>
+
+            <label for="loginPassword">Password:</label>
+            <input type="password" id="loginPassword" name="password" required>
+
+            <button type="submit" class="btn primary">Sign In</button>
+            <p id="loginMessage" class="message"></p>
+        </form>
+    </div>
+</div>
 
     <script src="/script.js"></script>
 </body>
+
 </html>
