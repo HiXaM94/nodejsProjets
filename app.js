@@ -16,15 +16,42 @@ let pool;
 function getPool() {
     if (pool) return pool;
 
-    const dbConfig = process.env.JAWSDB_URL ? process.env.JAWSDB_URL : {
-        host: process.env.DB_HOST || 'localhost',
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASSWORD || '',
-        database: process.env.DB_NAME || 'nodejsproj_db',
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
-    };
+    let dbConfig;
+
+    if (process.env.JAWSDB_URL) {
+        // Parse the URL to ensure SSL is handled correctly for TiDB/Vercel
+        try {
+            const dbUrl = new URL(process.env.JAWSDB_URL);
+            dbConfig = {
+                host: dbUrl.hostname,
+                user: dbUrl.username,
+                password: dbUrl.password,
+                database: dbUrl.pathname.substr(1),
+                port: dbUrl.port || 3306,
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0,
+                ssl: {
+                    rejectUnauthorized: true // Required for TiDB Cloud
+                }
+            };
+            console.log('Using parsed Database URL config');
+        } catch (e) {
+            console.error('Error parsing JAWSDB_URL, falling back to string:', e);
+            dbConfig = process.env.JAWSDB_URL;
+        }
+    } else {
+        // Local Development
+        dbConfig = {
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'nodejsproj_db',
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0
+        };
+    }
 
     console.log('Initializing database connection...');
     try {
