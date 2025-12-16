@@ -26,14 +26,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// R - READ (GET) all cats with Search and Pagination
-// R - READ (GET) all cats with Search and Pagination
+// R - READ (GET) all cats with Search, Tag Filter, and Pagination
 app.get('/cats', async (req, res) => {
     // 1. Get Parameters and Defaults
     const limit = parseInt(req.query.limit) || 8; 
     const page = parseInt(req.query.page) || 1;
-    // Use .toString() to be safe, then trim.
     const search = req.query.search ? req.query.search.toString().trim() : ''; 
+    // NEW: Get the tag filter parameter
+    const tagFilter = req.query.tagFilter ? req.query.tagFilter.toString().trim() : '';
 
     const offset = (page - 1) * limit;
     
@@ -42,31 +42,40 @@ app.get('/cats', async (req, res) => {
     };
 
     let whereClause = '';
-    let searchParams = [];
+    let conditions = []; // Array to hold individual WHERE conditions
+    let params = [];    // Array to hold query parameters
 
     // 2. Build Search (WHERE) Clause ONLY IF search is non-empty
-    if (search.length > 0) { // Check length > 0 for explicit safety
-        whereClause = ' WHERE name LIKE ? OR tag LIKE ? OR descreption LIKE ?';
+    if (search.length > 0) { 
+        conditions.push('(name LIKE ? OR tag LIKE ? OR descreption LIKE ?)');
         const searchTerm = `%${search}%`;
-        searchParams = [searchTerm, searchTerm, searchTerm];
+        params.push(searchTerm, searchTerm, searchTerm);
+    }
+    
+    // 3. NEW: Build Tag Filter Clause ONLY IF tagFilter is non-empty
+    if (tagFilter.length > 0) {
+        conditions.push('tag = ?');
+        params.push(tagFilter);
+    }
+    
+    // 4. Construct the WHERE clause if any conditions exist
+    if (conditions.length > 0) {
+        whereClause = ' WHERE ' + conditions.join(' AND ');
     }
 
     try {
-        // --- Query 1: Get Total Count (uses searchParams only) ---
+        // --- Query 1: Get Total Count ---
         const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
-        const [countRows] = await pool.execute(countSql, searchParams);
+        const [countRows] = await pool.execute(countSql, params);
         
         responseData.totalCount = countRows[0].total_count;
         responseData.totalPages = Math.ceil(responseData.totalCount / limit);
 
-        // --- Query 2: Get Cats Data (uses searchParams PLUS LIMIT/OFFSET) ---
-        // If whereClause is empty, the SQL is: SELECT * FROM cats ORDER BY id DESC LIMIT ? OFFSET ?
+        // --- Query 2: Get Cats Data ---
         const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
         
-        const catsParams = [...searchParams, limit, offset];
-        
-        console.log(`[SQL TRACE] Executing Query with ${catsParams.length} parameters.`);
-        console.log(`[SQL TRACE] Search: "${search}", Limit: ${limit}, Offset: ${offset}`);
+        // Add LIMIT and OFFSET to the parameters array
+        const catsParams = [...params, limit, offset];
 
         const [catsRows] = await pool.execute(catsSql, catsParams);
         responseData.cats = catsRows;
@@ -74,12 +83,120 @@ app.get('/cats', async (req, res) => {
         res.json(responseData);
 
     } catch (err) {
-        // CRITICAL: LOG THE ERROR to help you debug the final issue.
-        console.error('--- CRITICAL SQL ERROR ---');
+        console.error('--- SQL ERROR FETCHING CATS ---');
         console.error(`Error Message: ${err.message}`);
         return res.status(500).json({ error: 'Database error fetching cats.' });
     }
 });
+
+// R - READ (GET) all unique tags
+app.get('/tags', async (req, res) => {
+    try {
+        // Select distinct tags that are not empty or null
+        const sql = `SELECT DISTINCT tag FROM cats WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC`;
+        const [tagRows] = await pool.execute(sql);
+        
+        // Return only the rows (e.g., [{tag: 'MaineCoon'}, {tag: 'SillyCat'}])
+        res.json(tagRows); 
+
+    } catch (err) {
+        // Log the error for diagnosis
+        console.error('Database error fetching tags:', err.message); 
+        res.status(500).json({ error: 'Database error fetching tags.' });
+    }
+});
+
+// R - READ (GET) all cats with Search, Tag Filter, and Pagination
+app.get('/cats', async (req, res) => {
+    // 1. Get Parameters and Defaults
+    const limit = parseInt(req.query.limit) || 8; 
+    const page = parseInt(req.query.page) || 1;
+    const search = req.query.search ? req.query.search.toString().trim() : ''; 
+    // NEW: Get the tag filter parameter
+    const tagFilter = req.query.tagFilter ? req.query.tagFilter.toString().trim() : '';
+
+    const offset = (page - 1) * limit;
+    
+    const responseData = {
+        cats: [], totalCount: 0, totalPages: 0, currentPage: page, limit: limit
+    };
+
+    let whereClause = '';
+    let conditions = []; // Array to hold individual WHERE conditions
+    let params = [];    // Array to hold query parameters
+
+    // 2. Build Search (WHERE) Clause ONLY IF search is non-empty
+    if (search.length > 0) { 
+        conditions.push('(name LIKE ? OR tag LIKE ? OR descreption LIKE ?)');
+        const searchTerm = `%${search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+    }
+    
+    // 3. NEW: Build Tag Filter Clause ONLY IF tagFilter is non-empty
+    if (tagFilter.length > 0) {
+        conditions.push('tag = ?');
+        params.push(tagFilter);
+    }
+    
+    // 4. Construct the WHERE clause if any conditions exist
+    if (conditions.length > 0) {
+        whereClause = ' WHERE ' + conditions.join(' AND ');
+    }
+
+    try {
+        // --- Query 1: Get Total Count ---
+        const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
+        const [countRows] = await pool.execute(countSql, params);
+        
+        responseData.totalCount = countRows[0].total_count;
+        responseData.totalPages = Math.ceil(responseData.totalCount / limit);
+
+        // --- Query 2: Get Cats Data ---
+        const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
+        
+        // Add LIMIT and OFFSET to the parameters array
+        const catsParams = [...params, limit, offset];
+
+        const [catsRows] = await pool.execute(catsSql, catsParams);
+        responseData.cats = catsRows;
+
+        res.json(responseData);
+
+    } catch (err) {
+        console.error('--- SQL ERROR FETCHING CATS ---');
+        console.error(`Error Message: ${err.message}`);
+        return res.status(500).json({ error: 'Database error fetching cats.' });
+    }
+});
+
+// public/script.js - New function to fetch and populate tags
+async function fetchAndPopulateTags() {
+    try {
+        // You MUST create a simple backend route GET /tags to fetch unique tags.
+        const response = await fetch('/tags');
+        if (!response.ok) throw new Error('Failed to fetch tags.');
+        const tags = await response.json(); 
+
+        tagFilterSelect.innerHTML = '<option value="">-- Show All Tags --</option>'; // Reset
+        
+        tags.forEach(tag => {
+            const option = document.createElement('option');
+            option.value = tag.tag;
+            option.textContent = tag.tag;
+            tagFilterSelect.appendChild(option);
+        });
+
+        // Add event listener after populating
+        tagFilterSelect.addEventListener('change', () => {
+            currentTagFilter = tagFilterSelect.value;
+            currentPage = 1; // Reset to first page on filter change
+            fetchCats();
+        });
+
+    } catch (error) {
+        console.error('Error fetching tags:', error);
+    }
+}
 
 // C - CREATE (POST) a new cat (Handles Optional Image URL)
 app.post('/cats', async (req, res) => {

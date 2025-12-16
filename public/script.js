@@ -4,6 +4,14 @@ let currentSearch = '';
 const limit = 8; // Number of cats to display per page (must match app.js)
 let searchTimeout; // For auto-search debounce
 
+// NEW: Tag filter state
+let currentTagFilter = ''; 
+
+// NEW DOM Element
+const tagFilterSelect = document.getElementById('tagFilterSelect');
+
+
+
 // DOM Elements
 const gallery = document.getElementById('gallery');
 const modal = document.getElementById('catModal');
@@ -20,7 +28,11 @@ async function fetchCats() {
     if (paginationDiv) paginationDiv.style.display = 'none';
 
     // Construct the query URL
-    const url = `/cats?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(currentSearch)}`;
+    // public/script.js - Update fetchCats function
+
+// Construct the query URL
+    const url = `/cats?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(currentSearch)}&tagFilter=${encodeURIComponent(currentTagFilter)}`; // ADDED tagFilter
+    // const url = `/cats?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(currentSearch)}`;
 
     try {
         const response = await fetch(url);
@@ -39,18 +51,58 @@ async function fetchCats() {
     }
 }
 
+// public/script.js - Place this near your other async functions like fetchCats()
+
+// --- Tag Filtering and Population ---
+// --- Tag Filtering and Population ---
+async function fetchAndPopulateTags() {
+    try {
+        const response = await fetch('/tags');
+        if (!response.ok) throw new Error('Failed to fetch tags.');
+        const tags = await response.json(); 
+
+        // CRITICAL: Ensure tagFilterSelect is defined and exists
+        if (tagFilterSelect) {
+            tagFilterSelect.innerHTML = '<option value="">-- Show All Tags --</option>'; 
+            
+            tags.forEach(tag => {
+                const option = document.createElement('option');
+                option.value = tag.tag;
+                option.textContent = tag.tag;
+                tagFilterSelect.appendChild(option);
+            });
+
+            // Add change event listener
+            tagFilterSelect.addEventListener('change', () => {
+                currentTagFilter = tagFilterSelect.value;
+                currentPage = 1; // Reset to first page on filter change
+                fetchCats();
+            });
+        }
+
+    } catch (error) {
+        console.error('Error fetching tags:', error);
+    }
+}
+
+
+// --- Debounce Function for Auto-Search ---
 // --- Debounce Function for Auto-Search ---
 function handleAutoSearch() {
-    clearTimeout(searchTimeout); // Clear the previous timeout
+    clearTimeout(searchTimeout); 
+    
+    // Check if searchInput element exists before accessing its value
+    if (searchInput) {
+        currentSearch = searchInput.value; 
+    } else {
+        currentSearch = '';
+    }
+
+    // Set a new timeout
     searchTimeout = setTimeout(() => {
-        const newSearchTerm = searchInput.value.trim();
-        // Only run the search if the search term has actually changed
-        if (newSearchTerm !== currentSearch) {
-            currentSearch = newSearchTerm;
-            currentPage = 1; 
-            fetchCats();
-        }
-    }, 400); // 400ms delay for smooth typing experience
+        currentPage = 1; // Reset to the first page on a new search
+        fetchCats();
+    }, 500); // 500ms delay
 }
 
 // --- Rendering and Pagination Functions ---
@@ -214,23 +266,39 @@ function openEditModal(cat) {
 }
 
 
-// --- INITIALIZATION ---
+// --- INITIALIZATION ---¡
 document.addEventListener('DOMContentLoaded', () => {
-    // Modal & Form Setup
-    if (addCatBtn) addCatBtn.addEventListener('click', openAddModal);
-    const closeBtn = document.querySelector('.close-btn');
-    if (closeBtn) closeBtn.addEventListener('click', () => modal.style.display = 'none');
-    
-    window.addEventListener('click', (event) => {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
-    });
-    if (catForm) catForm.addEventListener('submit', saveCat);
+    console.log("1. DOMContentLoaded event fired."); // <-- ADD THIS
 
+    // --- ELEMENT RETRIEVAL BLOCK ---
+    const addCatBtn = document.getElementById('addCatBtn');
+    const modal = document.getElementById('catModal');
+    const catForm = document.getElementById('catForm');
+    const searchInput = document.getElementById('searchInput');
+    
+    // CRITICAL: Check the filter select element
+    const tagFilterSelect = document.getElementById('tagFilterSelect'); 
+    
+    console.log("2. All main elements retrieved."); // <-- ADD THIS
+
+    // --- CHECK FOR FAILED ELEMENTS ---
+    if (!tagFilterSelect) {
+        console.error("ERROR: tagFilterSelect (ID #tagFilterSelect) was not found in index.html."); // <-- ADD THIS
+        // If this logs, the ID in index.html is wrong, or the script loaded too early.
+    }
+    
+    // --- SETUP BLOCK ---
+    if (addCatBtn) addCatBtn.addEventListener('click', openAddModal);
+    // ... (rest of modal setup, search setup, etc.) ...
+    
     // AUTO-SEARCH SETUP
     if (searchInput) searchInput.addEventListener('keyup', handleAutoSearch);
     
+    // NEW: Fetch tags on load
+    if (tagFilterSelect) fetchAndPopulateTags();
+    
     // Initial data load
     fetchCats(); 
+    
+    console.log("3. Data fetch functions called."); // <-- ADD THIS
 });
