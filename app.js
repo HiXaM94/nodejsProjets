@@ -364,12 +364,211 @@ app.get('/', (req, res) => {
 app.get('/about', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'about.html'));
 });
+// R - READ (GET) all cats with Search, Tag Filter, and Pagination - PROTECTED ROUTE
+app.get('/api/cats', isAuthenticated, async (req, res) => {
+    const limit = parseInt(req.query.limit) || 8;
+    const page = parseInt(req.query.page) || 1;
+    const search = req.query.search ? req.query.search.toString().trim() : '';
+    const tagFilter = req.query.tagFilter ? req.query.tagFilter.toString().trim() : '';
+
+    const offset = (page - 1) * limit;
+
+    const responseData = {
+        cats: [], totalCount: 0, totalPages: 0, currentPage: page, limit: limit
+    };
+
+    let whereClause = '';
+    let conditions = [];
+    let params = [];
+
+    if (search.length > 0) {
+        conditions.push('(name LIKE ? OR tag LIKE ? OR descreption LIKE ?)');
+        const searchTerm = `%${search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    if (tagFilter.length > 0) {
+        conditions.push('tag = ?');
+        params.push(tagFilter);
+    }
+
+    if (conditions.length > 0) {
+        whereClause = ' WHERE ' + conditions.join(' AND ');
+    }
+
+    try {
+        const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
+        const [countRows] = await pool.execute(countSql, params);
+
+        responseData.totalCount = countRows[0].total_count;
+        responseData.totalPages = Math.ceil(responseData.totalCount / limit);
+
+        const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
+        const catsParams = [...params, limit, offset];
+
+        const [catsRows] = await pool.execute(catsSql, catsParams);
+        responseData.cats = catsRows;
+
+        res.json(responseData);
+
+    } catch (err) {
+        console.error('SQL ERROR FETCHING CATS:', err.message);
+        return res.status(500).json({ error: 'Database error fetching cats.' });
+    }
+});
+
+// R - READ (GET) all unique tags - PROTECTED ROUTE
+app.get('/api/tags', isAuthenticated, async (req, res) => {
+    try {
+        const sql = `SELECT DISTINCT tag FROM cats WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC`;
+        const [tagRows] = await pool.execute(sql);
+        res.json(tagRows);
+
+    } catch (err) {
+        console.error('Database error fetching tags:', err.message);
+        res.status(500).json({ error: 'Database error fetching tags.' });
+    }
+});
+
+// C - CREATE (POST) a new cat - PROTECTED ROUTE
+app.post('/api/cats', isAuthenticated, async (req, res) => {
+    const { name, tag, descreption, img } = req.body;
+
+    if (!name || !tag) {
+        return res.status(400).json({ error: 'Name and Tag are required fields.' });
+    }
+
+    let imageUrl = img;
+
+    try {
+        if (!imageUrl || imageUrl.trim() === '') {
+            const cataasBaseUrl = 'https://cataas.com/cat';
+            const uniqueUrl = `${cataasBaseUrl}?_ts=${Date.now()}`;
+
+            const imageResponse = await fetch(uniqueUrl, { redirect: 'manual' });
+
+            if (imageResponse.status === 302 || imageResponse.status === 307) {
+                imageUrl = imageResponse.headers.get('location');
+            } else if (imageResponse.ok && imageResponse.url) {
+                imageUrl = imageResponse.url;
+            } else {
+                imageUrl = '/placeholder.jpg';
+            }
+        }
+
+        if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
+
+        const sql = 'INSERT INTO cats (name, tag, descreption, img, user_id) VALUES (?, ?, ?, ?, ?)';
+        const [result] = await pool.execute(sql, [name, tag, descreption, imageUrl, req.session.userId]);
+
+        res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
+
+    } catch (err) {
+        console.error('Database insertion error or Image fetch error:', err);
+        return res.status(500).json({ error: 'Error creating new cat or fetching image.' });
+    }
+});
+
+// U - UPDATE (PUT) a cat by ID - PROTECTED ROUTE
+app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
+    const { id } = req.params;
+    const { name, tag, descreption, img } = req.body;
+
+    console.log(`Attempting to update cat ${id} for user ${req.session.userId}`);
+
+    if (!name || !tag) {
+        return res.status(400).json({ error: 'Name and Tag are required fields.' });
+    }
+
+    try {
+        let sql;
+        let params;
+
+        if (img && img.trim() !== '') {
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ? WHERE id = ? AND user_id = ?';
+            params = [name, tag, descreption, img, id, req.session.userId];
+        } else {
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ? WHERE id = ? AND user_id = ?';
+            params = [name, tag, descreption, id, req.session.userId];
+        }
+
+        console.log('Executing SQL:', sql);
+        console.log('With params:', params);
+
+        const [result] = await pool.execute(sql, params);
+
+        console.log('Update result:', result);
+
+        if (result.affectedRows === 0) {
+            console.log('No rows affected. Cat not found or user mismatch.');
+            return res.status(404).json({ message: 'Cat not found or unauthorized.' });
+        }
+
+        res.json({ message: 'Cat updated successfully.' });
+
+    } catch (err) {
+        console.error('Database update error:', err);
+        res.status(500).json({ error: 'Error updating cat.' });
+    }
+});
+
+// D - DELETE (DELETE) a cat by ID - PROTECTED ROUTE
+app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const sql = 'DELETE FROM cats WHERE id = ? AND user_id = ?';
+        const [result] = await pool.execute(sql, [id, req.session.userId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Cat not found or unauthorized.' });
+        }
+
+        res.json({ message: 'Cat deleted successfully.' });
+
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ error: 'Error deleting cat.' });
+    }
+});
+
+// --- CONTACT FORM ROUTE ---
+app.post('/api/contact', async (req, res) => {
+    const { name, email, subject, message } = req.body;
+
+    if (!name || !email || !message) {
+        return res.status(400).json({ error: 'Name, email, and message are required.' });
+    }
+
+    try {
+        const sql = 'INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())';
+        await pool.execute(sql, [name, email, subject || '', message]);
+
+        res.json({ message: 'Message sent successfully! We will get back to you soon.' });
+    } catch (err) {
+        console.error('Contact form error:', err);
+        res.status(500).json({ error: 'Error sending message.' });
+    }
+});
+
+// --- SERVE STATIC PAGES ---
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/about', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'about.html'));
+});
 
 app.get('/contact', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'contact.html'));
 });
 
 // --- Server Start ---
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-});
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`Server running at http://localhost:${port}`);
+    });
+}
+
+module.exports = app;
