@@ -2,79 +2,213 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const fetch = require('node-fetch');
 const path = require('path');
+const bcrypt = require('bcrypt');
+const session = require('express-session');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
+const ONE_HOUR = 1000 * 60 * 60;
+const SALT_ROUNDS = 10;
 
-// --- Database Configuration (VERIFY THESE AGAIN) ---
-const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root', 
-    password: '', // CONFIRMED: Use your actual password or ''
-    database: 'nodejsproj_db', // CONFIRMED: Use your actual database name
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+// --- Database Configuration ---
+let pool;
+
+if (process.env.JAWSDB_URL) {
+    // Heroku Deployment (JawsDB)
+    pool = mysql.createPool(process.env.JAWSDB_URL);
+} else {
+    // Local Development
+    pool = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'nodejsproj_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+    });
+}
 
 // --- Middleware ---
-app.use(express.json()); 
-app.use(express.static(path.join(__dirname, 'public'))); 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve the index.html file
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// Configure session middleware
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // True in production (HTTPS)
+        httpOnly: true,
+        maxAge: ONE_HOUR
+    }
+}));
+
+// --- Authentication Middleware ---
+const isAuthenticated = (req, res, next) => {
+    if (req.session && req.session.userId) {
+        return next();
+    }
+    return res.status(401).json({ error: 'Unauthorized. Please login to view this content.' });
+};
+
+// --- AUTHENTICATION ROUTES ---
+
+// Register new user
+app.post('/api/auth/register', async (req, res) => {
+    const { username, password, email } = req.body;
+
+    console.log('Registration request received:', { username, email });
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    try {
+        // Check if username already exists
+        const checkSql = 'SELECT id FROM users WHERE username = ?';
+        const [existingUsers] = await pool.execute(checkSql, [username]);
+
+        if (existingUsers.length > 0) {
+            return res.status(409).json({ error: 'Username already exists.' });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // Insert new user
+        const insertSql = 'INSERT INTO users (username, password, email) VALUES (?, ?, ?)';
+        const [result] = await pool.execute(insertSql, [username, hashedPassword, email || null]);
+
+        console.log('User registered successfully:', result.insertId);
+
+        res.status(201).json({
+            message: 'User registered successfully!',
+            userId: result.insertId
+        });
+
+    } catch (err) {
+        console.error('Registration error:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ error: 'Error registering user.', details: err.message });
+    }
 });
 
-// R - READ (GET) all cats with Search, Tag Filter, and Pagination
-app.get('/cats', async (req, res) => {
-    // 1. Get Parameters and Defaults
-    const limit = parseInt(req.query.limit) || 8; 
+// Login user
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    try {
+        // Find user
+        const sql = 'SELECT id, username, password FROM users WHERE username = ?';
+        const [users] = await pool.execute(sql, [username]);
+
+        if (users.length === 0) {
+            return res.status(401).json({ error: 'Invalid username or password.' });
+        }
+
+        const user = users[0];
+
+        // Verify password
+        const isValidPassword = await bcrypt.compare(password, user.password);
+
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid username or password.' });
+        }
+
+        // Create session
+        req.session.userId = user.id;
+        req.session.username = user.username;
+
+        // Update last login
+        await pool.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+
+        res.json({
+            message: 'Login successful!',
+            user: { id: user.id, username: user.username }
+        });
+
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Error during login.' });
+    }
+});
+
+// Logout user
+app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Error logging out.' });
+        }
+        res.clearCookie('connect.sid');
+        res.json({ message: 'Logout successful!' });
+    });
+});
+
+// Check session status
+app.get('/api/auth/status', (req, res) => {
+    if (req.session && req.session.userId) {
+        res.json({
+            authenticated: true,
+            user: { id: req.session.userId, username: req.session.username }
+        });
+    } else {
+        res.json({ authenticated: false });
+    }
+});
+
+// --- CATS CRUD ROUTES ---
+
+// R - READ (GET) all cats with Search, Tag Filter, and Pagination - PROTECTED ROUTE
+app.get('/api/cats', isAuthenticated, async (req, res) => {
+    const limit = parseInt(req.query.limit) || 8;
     const page = parseInt(req.query.page) || 1;
-    const search = req.query.search ? req.query.search.toString().trim() : ''; 
-    // NEW: Get the tag filter parameter
+    const search = req.query.search ? req.query.search.toString().trim() : '';
     const tagFilter = req.query.tagFilter ? req.query.tagFilter.toString().trim() : '';
 
     const offset = (page - 1) * limit;
-    
+
     const responseData = {
         cats: [], totalCount: 0, totalPages: 0, currentPage: page, limit: limit
     };
 
     let whereClause = '';
-    let conditions = []; // Array to hold individual WHERE conditions
-    let params = [];    // Array to hold query parameters
+    let conditions = [];
+    let params = [];
 
-    // 2. Build Search (WHERE) Clause ONLY IF search is non-empty
-    if (search.length > 0) { 
+    if (search.length > 0) {
         conditions.push('(name LIKE ? OR tag LIKE ? OR descreption LIKE ?)');
         const searchTerm = `%${search}%`;
         params.push(searchTerm, searchTerm, searchTerm);
     }
-    
-    // 3. NEW: Build Tag Filter Clause ONLY IF tagFilter is non-empty
+
     if (tagFilter.length > 0) {
         conditions.push('tag = ?');
         params.push(tagFilter);
     }
-    
-    // 4. Construct the WHERE clause if any conditions exist
+
     if (conditions.length > 0) {
         whereClause = ' WHERE ' + conditions.join(' AND ');
     }
 
     try {
-        // --- Query 1: Get Total Count ---
         const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
         const [countRows] = await pool.execute(countSql, params);
-        
+
         responseData.totalCount = countRows[0].total_count;
         responseData.totalPages = Math.ceil(responseData.totalCount / limit);
 
-        // --- Query 2: Get Cats Data ---
         const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
-        
-        // Add LIMIT and OFFSET to the parameters array
         const catsParams = [...params, limit, offset];
 
         const [catsRows] = await pool.execute(catsSql, catsParams);
@@ -83,140 +217,41 @@ app.get('/cats', async (req, res) => {
         res.json(responseData);
 
     } catch (err) {
-        console.error('--- SQL ERROR FETCHING CATS ---');
-        console.error(`Error Message: ${err.message}`);
+        console.error('SQL ERROR FETCHING CATS:', err.message);
         return res.status(500).json({ error: 'Database error fetching cats.' });
     }
 });
 
-// R - READ (GET) all unique tags
-app.get('/tags', async (req, res) => {
+// R - READ (GET) all unique tags - PROTECTED ROUTE
+app.get('/api/tags', isAuthenticated, async (req, res) => {
     try {
-        // Select distinct tags that are not empty or null
         const sql = `SELECT DISTINCT tag FROM cats WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC`;
         const [tagRows] = await pool.execute(sql);
-        
-        // Return only the rows (e.g., [{tag: 'MaineCoon'}, {tag: 'SillyCat'}])
-        res.json(tagRows); 
+        res.json(tagRows);
 
     } catch (err) {
-        // Log the error for diagnosis
-        console.error('Database error fetching tags:', err.message); 
+        console.error('Database error fetching tags:', err.message);
         res.status(500).json({ error: 'Database error fetching tags.' });
     }
 });
 
-// R - READ (GET) all cats with Search, Tag Filter, and Pagination
-app.get('/cats', async (req, res) => {
-    // 1. Get Parameters and Defaults
-    const limit = parseInt(req.query.limit) || 8; 
-    const page = parseInt(req.query.page) || 1;
-    const search = req.query.search ? req.query.search.toString().trim() : ''; 
-    // NEW: Get the tag filter parameter
-    const tagFilter = req.query.tagFilter ? req.query.tagFilter.toString().trim() : '';
+// C - CREATE (POST) a new cat - PROTECTED ROUTE
+app.post('/api/cats', isAuthenticated, async (req, res) => {
+    const { name, tag, descreption, img } = req.body;
 
-    const offset = (page - 1) * limit;
-    
-    const responseData = {
-        cats: [], totalCount: 0, totalPages: 0, currentPage: page, limit: limit
-    };
-
-    let whereClause = '';
-    let conditions = []; // Array to hold individual WHERE conditions
-    let params = [];    // Array to hold query parameters
-
-    // 2. Build Search (WHERE) Clause ONLY IF search is non-empty
-    if (search.length > 0) { 
-        conditions.push('(name LIKE ? OR tag LIKE ? OR descreption LIKE ?)');
-        const searchTerm = `%${search}%`;
-        params.push(searchTerm, searchTerm, searchTerm);
-    }
-    
-    // 3. NEW: Build Tag Filter Clause ONLY IF tagFilter is non-empty
-    if (tagFilter.length > 0) {
-        conditions.push('tag = ?');
-        params.push(tagFilter);
-    }
-    
-    // 4. Construct the WHERE clause if any conditions exist
-    if (conditions.length > 0) {
-        whereClause = ' WHERE ' + conditions.join(' AND ');
-    }
-
-    try {
-        // --- Query 1: Get Total Count ---
-        const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
-        const [countRows] = await pool.execute(countSql, params);
-        
-        responseData.totalCount = countRows[0].total_count;
-        responseData.totalPages = Math.ceil(responseData.totalCount / limit);
-
-        // --- Query 2: Get Cats Data ---
-        const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
-        
-        // Add LIMIT and OFFSET to the parameters array
-        const catsParams = [...params, limit, offset];
-
-        const [catsRows] = await pool.execute(catsSql, catsParams);
-        responseData.cats = catsRows;
-
-        res.json(responseData);
-
-    } catch (err) {
-        console.error('--- SQL ERROR FETCHING CATS ---');
-        console.error(`Error Message: ${err.message}`);
-        return res.status(500).json({ error: 'Database error fetching cats.' });
-    }
-});
-
-// public/script.js - New function to fetch and populate tags
-async function fetchAndPopulateTags() {
-    try {
-        // You MUST create a simple backend route GET /tags to fetch unique tags.
-        const response = await fetch('/tags');
-        if (!response.ok) throw new Error('Failed to fetch tags.');
-        const tags = await response.json(); 
-
-        tagFilterSelect.innerHTML = '<option value="">-- Show All Tags --</option>'; // Reset
-        
-        tags.forEach(tag => {
-            const option = document.createElement('option');
-            option.value = tag.tag;
-            option.textContent = tag.tag;
-            tagFilterSelect.appendChild(option);
-        });
-
-        // Add event listener after populating
-        tagFilterSelect.addEventListener('change', () => {
-            currentTagFilter = tagFilterSelect.value;
-            currentPage = 1; // Reset to first page on filter change
-            fetchCats();
-        });
-
-    } catch (error) {
-        console.error('Error fetching tags:', error);
-    }
-}
-
-// C - CREATE (POST) a new cat (Handles Optional Image URL)
-app.post('/cats', async (req, res) => {
-    const { name, tag, descreption, img } = req.body; // Extract img here
-    
     if (!name || !tag) {
         return res.status(400).json({ error: 'Name and Tag are required fields.' });
     }
-    
-    let imageUrl = img; // Start with the provided img URL
+
+    let imageUrl = img;
 
     try {
-        // Only fetch a random image if NO URL was provided by the user
         if (!imageUrl || imageUrl.trim() === '') {
-            const cataasBaseUrl = 'https://cataas.com/cat'; 
+            const cataasBaseUrl = 'https://cataas.com/cat';
             const uniqueUrl = `${cataasBaseUrl}?_ts=${Date.now()}`;
-            
-            // Logic to fetch a random image from Cataas
+
             const imageResponse = await fetch(uniqueUrl, { redirect: 'manual' });
-            
+
             if (imageResponse.status === 302 || imageResponse.status === 307) {
                 imageUrl = imageResponse.headers.get('location');
             } else if (imageResponse.ok && imageResponse.url) {
@@ -225,12 +260,11 @@ app.post('/cats', async (req, res) => {
                 imageUrl = '/placeholder.jpg';
             }
         }
-        
+
         if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
 
-        // Insert into database using the CONFIRMED spelling 'descreption'
-        const sql = 'INSERT INTO cats (name, tag, descreption, img) VALUES (?, ?, ?, ?)';
-        const [result] = await pool.execute(sql, [name, tag, descreption, imageUrl]);
+        const sql = 'INSERT INTO cats (name, tag, descreption, img, user_id) VALUES (?, ?, ?, ?, ?)';
+        const [result] = await pool.execute(sql, [name, tag, descreption, imageUrl, req.session.userId]);
 
         res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
 
@@ -240,12 +274,13 @@ app.post('/cats', async (req, res) => {
     }
 });
 
-
-// U - UPDATE (PUT) a cat by ID (Handles Image URL Update)
-app.put('/cats/:id', async (req, res) => {
+// U - UPDATE (PUT) a cat by ID - PROTECTED ROUTE
+app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
-    const { name, tag, descreption, img } = req.body; // Extract img here
-    
+    const { name, tag, descreption, img } = req.body;
+
+    console.log(`Attempting to update cat ${id} for user ${req.session.userId}`);
+
     if (!name || !tag) {
         return res.status(400).json({ error: 'Name and Tag are required fields.' });
     }
@@ -253,21 +288,25 @@ app.put('/cats/:id', async (req, res) => {
     try {
         let sql;
         let params;
-        
-        // If the user provided a new image URL, update the 'img' column too
+
         if (img && img.trim() !== '') {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ? WHERE id = ?';
-            params = [name, tag, descreption, img, id];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ? WHERE id = ? AND user_id = ?';
+            params = [name, tag, descreption, img, id, req.session.userId];
         } else {
-            // Otherwise, only update the text fields
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ? WHERE id = ?';
-            params = [name, tag, descreption, id];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ? WHERE id = ? AND user_id = ?';
+            params = [name, tag, descreption, id, req.session.userId];
         }
+
+        console.log('Executing SQL:', sql);
+        console.log('With params:', params);
 
         const [result] = await pool.execute(sql, params);
 
+        console.log('Update result:', result);
+
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Cat not found.' });
+            console.log('No rows affected. Cat not found or user mismatch.');
+            return res.status(404).json({ message: 'Cat not found or unauthorized.' });
         }
 
         res.json({ message: 'Cat updated successfully.' });
@@ -278,17 +317,16 @@ app.put('/cats/:id', async (req, res) => {
     }
 });
 
-
-// D - DELETE (DELETE) a cat by ID
-app.delete('/cats/:id', async (req, res) => {
+// D - DELETE (DELETE) a cat by ID - PROTECTED ROUTE
+app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const sql = 'DELETE FROM cats WHERE id = ?';
-        const [result] = await pool.execute(sql, [id]);
+        const sql = 'DELETE FROM cats WHERE id = ? AND user_id = ?';
+        const [result] = await pool.execute(sql, [id, req.session.userId]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Cat not found.' });
+            return res.status(404).json({ message: 'Cat not found or unauthorized.' });
         }
 
         res.json({ message: 'Cat deleted successfully.' });
@@ -299,6 +337,37 @@ app.delete('/cats/:id', async (req, res) => {
     }
 });
 
+// --- CONTACT FORM ROUTE ---
+app.post('/api/contact', async (req, res) => {
+    const { name, email, subject, message } = req.body;
+
+    if (!name || !email || !message) {
+        return res.status(400).json({ error: 'Name, email, and message are required.' });
+    }
+
+    try {
+        const sql = 'INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())';
+        await pool.execute(sql, [name, email, subject || '', message]);
+
+        res.json({ message: 'Message sent successfully! We will get back to you soon.' });
+    } catch (err) {
+        console.error('Contact form error:', err);
+        res.status(500).json({ error: 'Error sending message.' });
+    }
+});
+
+// --- SERVE STATIC PAGES ---
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/about', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'about.html'));
+});
+
+app.get('/contact', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'contact.html'));
+});
 
 // --- Server Start ---
 app.listen(port, () => {

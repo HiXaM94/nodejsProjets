@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Cats Gallery</title>
+    <meta name="description" content="Learn more about Cats Gallery and our mission to share the joy of cats">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Modern Navigation Bar -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <span class="logo-icon">🐱</span>
+                <span class="logo-text">CatsGallery</span>
+            </a>
+
+            <div class="nav-menu" id="navMenu">
+                <a href="/" class="nav-link" data-page="home">
+                    <span class="nav-icon">🏠</span>
+                    Home
+                </a>
+                <a href="/about" class="nav-link active" data-page="about">
+                    <span class="nav-icon">ℹ️</span>
+                    About
+                </a>
+                <a href="/contact" class="nav-link" data-page="contact">
+                    <span class="nav-icon">✉️</span>
+                    Contact
+                </a>
+            </div>
+
+            <div class="nav-auth" id="navAuth">
+                <button id="loginBtn" class="btn btn-outline">Login</button>
+                <button id="registerBtn" class="btn btn-primary">Register</button>
+            </div>
+
+            <button class="nav-toggle" id="navToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="content-wrapper">
+            <header class="page-header">
+                <h1 class="page-title">About Cats Gallery</h1>
+                <p class="page-subtitle">Celebrating the joy and beauty of our feline friends</p>
+            </header>
+
+            <div class="about-content">
+                <section class="about-section">
+                    <div class="section-icon">🎯</div>
+                    <h2>Our Mission</h2>
+                    <p>
+                        Cats Gallery is dedicated to creating a vibrant community of cat lovers who can share,
+                        discover, and celebrate the beauty and charm of cats from around the world. We believe
+                        that every cat has a unique personality and story worth sharing.
+                    </p>
+                </section>
+
+                <section class="about-section">
+                    <div class="section-icon">✨</div>
+                    <h2>What We Offer</h2>
+                    <ul class="feature-list">
+                        <li><strong>Free Gallery:</strong> Browse through thousands of adorable cat photos</li>
+                        <li><strong>Easy Sharing:</strong> Upload and share your favorite cat moments</li>
+                        <li><strong>Community:</strong> Connect with fellow cat enthusiasts worldwide</li>
+                        <li><strong>Organization:</strong> Tag and categorize cats by breed, personality, and more</li>
+                        <li><strong>Discovery:</strong> Find cats by searching tags, names, or descriptions</li>
+                    </ul>
+                </section>
+
+                <section class="about-section">
+                    <div class="section-icon">🚀</div>
+                    <h2>How It Started</h2>
+                    <p>
+                        Born from a passion for cats and technology, Cats Gallery was created to bring together
+                        cat lovers in a beautiful, user-friendly platform. What started as a simple photo gallery
+                        has grown into a thriving community where thousands of cat moments are shared every day.
+                    </p>
+                </section>
+
+                <section class="about-section">
+                    <div class="section-icon">💝</div>
+                    <h2>Join Our Community</h2>
+                    <p>
+                        Whether you're a proud cat parent, a casual observer, or someone who just appreciates
+                        the internet's favorite animal, Cats Gallery welcomes you. Create an account to start
+                        sharing your cat's photos, or simply enjoy the endless stream of cuteness from our community.
+                    </p>
+                    <div class="cta-buttons">
+                        <a href="/" class="btn btn-primary">Browse Gallery</a>
+                        <button onclick="openRegisterModal()" class="btn btn-outline">Join Now</button>
+                    </div>
+                </section>
+
+                <section class="stats-section">
+                    <h2>Our Growing Community</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">10K+</div>
+                            <div class="stat-label">Cat Photos</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">5K+</div>
+                            <div class="stat-label">Active Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">50+</div>
+                            <div class="stat-label">Cat Breeds</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">100%</div>
+                            <div class="stat-label">Adorable</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content auth-modal-content">
+            <span class="close-btn" onclick="closeAuthModal()">&times;</span>
+
+            <h2 class="auth-title">User Authentication</h2>
+
+            <div class="auth-toggle">
+                <button id="showLoginBtn" class="active">Sign In</button>
+                <button id="showRegisterBtn">Register</button>
+            </div>
+
+            <form id="registerForm" style="display: none;">
+                <h3>Create Account</h3>
+                <label for="regUsername">Username:</label>
+                <input type="text" id="regUsername" name="username" required minlength="3">
+
+                <label for="regEmail">Email (Optional):</label>
+                <input type="email" id="regEmail" name="email">
+
+                <label for="regPassword">Password:</label>
+                <input type="password" id="regPassword" name="password" required minlength="6">
+
+                <button type="submit" class="btn btn-primary full-width">Register</button>
+                <p id="registerMessage" class="message"></p>
+            </form>
+
+            <form id="loginForm">
+                <h3>Access Account</h3>
+                <label for="loginUsername">Username:</label>
+                <input type="text" id="loginUsername" name="username" required>
+
+                <label for="loginPassword">Password:</label>
+                <input type="password" id="loginPassword" name="password" required>
+
+                <button type="submit" class="btn btn-primary full-width">Sign In</button>
+                <p id="loginMessage" class="message"></p>
+            </form>
+        </div>
+    </div>
+
+    <script src="/auth.js"></script>
+</body>
+
+</html>

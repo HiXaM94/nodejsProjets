@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - Cats Gallery</title>
+    <meta name="description" content="Get in touch with the Cats Gallery team">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Modern Navigation Bar -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <span class="logo-icon">🐱</span>
+                <span class="logo-text">CatsGallery</span>
+            </a>
+
+            <div class="nav-menu" id="navMenu">
+                <a href="/" class="nav-link" data-page="home">
+                    <span class="nav-icon">🏠</span>
+                    Home
+                </a>
+                <a href="/about" class="nav-link" data-page="about">
+                    <span class="nav-icon">ℹ️</span>
+                    About
+                </a>
+                <a href="/contact" class="nav-link active" data-page="contact">
+                    <span class="nav-icon">✉️</span>
+                    Contact
+                </a>
+            </div>
+
+            <div class="nav-auth" id="navAuth">
+                <button id="loginBtn" class="btn btn-outline">Login</button>
+                <button id="registerBtn" class="btn btn-primary">Register</button>
+            </div>
+
+            <button class="nav-toggle" id="navToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="content-wrapper">
+            <header class="page-header">
+                <h1 class="page-title">Get in Touch</h1>
+                <p class="page-subtitle">We'd love to hear from you! Send us a message and we'll respond as soon as
+                    possible</p>
+            </header>
+
+            <div class="contact-content">
+                <div class="contact-grid">
+                    <div class="contact-form-section">
+                        <h2>Send us a Message</h2>
+                        <form id="contactForm" class="contact-form">
+                            <div class="form-group">
+                                <label for="contactName">Your Name *</label>
+                                <input type="text" id="contactName" name="name" required placeholder="John Doe">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="contactEmail">Your Email *</label>
+                                <input type="email" id="contactEmail" name="email" required
+                                    placeholder="john@example.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="contactSubject">Subject</label>
+                                <input type="text" id="contactSubject" name="subject" placeholder="How can we help?">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="contactMessage">Message *</label>
+                                <textarea id="contactMessage" name="message" rows="6" required
+                                    placeholder="Tell us what's on your mind..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary full-width">
+                                Send Message
+                            </button>
+                            <p id="contactFormMessage" class="message"></p>
+                        </form>
+                    </div>
+
+                    <div class="contact-info-section">
+                        <h2>Other Ways to Reach Us</h2>
+
+                        <div class="contact-info-card">
+                            <div class="contact-icon">📧</div>
+                            <h3>Email</h3>
+                            <p>support@catsgallery.com</p>
+                            <p class="contact-detail">We typically respond within 24 hours</p>
+                        </div>
+
+                        <div class="contact-info-card">
+                            <div class="contact-icon">💬</div>
+                            <h3>Social Media</h3>
+                            <p>@catsgallery</p>
+                            <p class="contact-detail">Follow us for daily cat content</p>
+                        </div>
+
+                        <div class="contact-info-card">
+                            <div class="contact-icon">🕐</div>
+                            <h3>Support Hours</h3>
+                            <p>Monday - Friday</p>
+                            <p class="contact-detail">9:00 AM - 6:00 PM EST</p>
+                        </div>
+
+                        <div class="faq-section">
+                            <h3>Quick Questions?</h3>
+                            <p>Check out our frequently asked questions:</p>
+                            <ul class="faq-list">
+                                <li><strong>How do I upload a cat photo?</strong><br>
+                                    Create an account, log in, and click "Add Cat" on the home page.</li>
+                                <li><strong>Is the service free?</strong><br>
+                                    Yes! Cats Gallery is completely free to use.</li>
+                                <li><strong>Can I delete my photos?</strong><br>
+                                    Yes, you can edit or delete any photos you've uploaded.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content auth-modal-content">
+            <span class="close-btn" onclick="closeAuthModal()">&times;</span>
+
+            <h2 class="auth-title">User Authentication</h2>
+
+            <div class="auth-toggle">
+                <button id="showLoginBtn" class="active">Sign In</button>
+                <button id="showRegisterBtn">Register</button>
+            </div>
+
+            <form id="registerForm" style="display: none;">
+                <h3>Create Account</h3>
+                <label for="regUsername">Username:</label>
+                <input type="text" id="regUsername" name="username" required minlength="3">
+
+                <label for="regEmail">Email (Optional):</label>
+                <input type="email" id="regEmail" name="email">
+
+                <label for="regPassword">Password:</label>
+                <input type="password" id="regPassword" name="password" required minlength="6">
+
+                <button type="submit" class="btn btn-primary full-width">Register</button>
+                <p id="registerMessage" class="message"></p>
+            </form>
+
+            <form id="loginForm">
+                <h3>Access Account</h3>
+                <label for="loginUsername">Username:</label>
+                <input type="text" id="loginUsername" name="username" required>
+
+                <label for="loginPassword">Password:</label>
+                <input type="password" id="loginPassword" name="password" required>
+
+                <button type="submit" class="btn btn-primary full-width">Sign In</button>
+                <p id="loginMessage" class="message"></p>
+            </form>
+        </div>
+    </div>
+
+    <script src="/contact.js"></script>
+</body>
+
+</html>
