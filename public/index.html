@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
 <body>
@@ -17,21 +18,21 @@
     <nav class="navbar" id="navbar">
         <div class="nav-container">
             <a href="/" class="nav-logo">
-                <span class="logo-icon">🐱</span>
+                <span class="logo-icon"><i data-lucide="cat"></i></span>
                 <span class="logo-text">CatsGallery</span>
             </a>
 
             <div class="nav-menu" id="navMenu">
                 <a href="/" class="nav-link active" data-page="home">
-                    <span class="nav-icon">🏠</span>
+                    <span class="nav-icon"><i data-lucide="home"></i></span>
                     Home
                 </a>
                 <a href="/about" class="nav-link" data-page="about">
-                    <span class="nav-icon">ℹ️</span>
+                    <span class="nav-icon"><i data-lucide="info"></i></span>
                     About
                 </a>
                 <a href="/contact" class="nav-link" data-page="contact">
-                    <span class="nav-icon">✉️</span>
+                    <span class="nav-icon"><i data-lucide="mail"></i></span>
                     Contact
                 </a>
             </div>
@@ -60,20 +61,17 @@
     <!-- Horizontal Search & Filter Section -->
     <div class="search-filter-controls">
         <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search cats...">
-            <span class="search-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                    stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </span>
+            <i data-lucide="search" class="search-input-icon"></i>
+            <input type="text" id="searchInput" placeholder="Search cats by name, tag or description...">
         </div>
 
-        <div class="filter-container">
-            <select id="tagFilterSelect">
-                <option value="">All Tags</option>
-            </select>
+        <div class="filter-wrapper">
+            <div class="filter-container">
+                <i data-lucide="filter" class="filter-input-icon"></i>
+                <select id="tagFilterSelect">
+                    <option value="">All Tags</option>
+                </select>
+            </div>
         </div>
     </div>
 

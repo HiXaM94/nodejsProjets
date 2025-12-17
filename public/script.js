@@ -395,6 +395,11 @@ function renderCats(cats) {
 
         gallery.appendChild(catCard);
     });
+
+    // Refresh icons for dynamic content
+    if (window.lucide) {
+        window.lucide.createIcons();
+    }
 }
 
 // Render pagination controls
@@ -612,6 +617,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const contactForm = document.getElementById('contactForm');
     if (contactForm) {
         contactForm.addEventListener('submit', handleContactSubmit);
+    }
+
+    // Initialize Lucide Icons
+    if (window.lucide) {
+        window.lucide.createIcons();
     }
 
     console.log('All event listeners attached');
