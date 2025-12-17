@@ -105,6 +105,56 @@ const isAuthenticated = (req, res, next) => {
     return res.status(401).json({ error: 'Unauthorized. Please login to view this content.' });
 };
 
+// --- SETUP ROUTE (Run once to fix database) ---
+app.get('/api/setup-db', async (req, res) => {
+    try {
+        console.log('Running database setup...');
+
+        // 1. Create Users Table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                email VARCHAR(100),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME
+            )
+        `);
+
+        // 2. Create Cats Table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS cats (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(50) NOT NULL,
+                descreption TEXT,
+                img VARCHAR(255),
+                user_id INT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        `);
+
+        // 3. Create Contact Messages Table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS contact_messages (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) NOT NULL,
+                subject VARCHAR(200),
+                message TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        res.send('<h1>Database Setup Complete! ✅</h1><p>Tables created successfully. <a href="/">Go back to Home</a></p>');
+    } catch (err) {
+        console.error('Setup error:', err);
+        res.status(500).send(`<h1>Setup Failed ❌</h1><p>Error: ${err.message}</p>`);
+    }
+});
+
 // --- AUTHENTICATION ROUTES ---
 
 // Register new user
