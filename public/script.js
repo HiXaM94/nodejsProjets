@@ -319,10 +319,6 @@ async function fetchAndPopulateTags() {
             tagFilterSelect.value = currentTagFilter;
         }
 
-        // Add event listener only once (check if already added?)
-        // Actually, replacing innerHTML removes listeners on options, but not on select.
-        // The listener is added in init.
-
     } catch (error) {
         console.error('Error fetching tags:', error);
     }
@@ -369,6 +365,13 @@ function renderCats(cats) {
             <div class="cat-info">
                 <h3>${cat.name}</h3>
                 <div class="tag-box">${cat.tag}</div>
+                
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-medium);">
+                    ${cat.age ? `<span style="background:#f3f4f6; padding:2px 8px; border-radius:12px;">🎂 ${cat.age}y</span>` : ''}
+                    ${cat.gender ? `<span style="background:#f3f4f6; padding:2px 8px; border-radius:12px;">${cat.gender === 'Male' ? '♂️' : '♀️'} ${cat.gender}</span>` : ''}
+                    ${cat.origin ? `<span style="background:#f3f4f6; padding:2px 8px; border-radius:12px;">🌍 ${cat.origin}</span>` : ''}
+                </div>
+
                 <p>${cat.descreption || 'No description provided.'}</p>
                 ${currentUser ? `
                 <div class="actions">
@@ -424,6 +427,9 @@ async function saveCat(event) {
     const tag = document.getElementById('catTag').value;
     const descreption = document.getElementById('catDescreption').value;
     const img = document.getElementById('catImgUrl').value;
+    const age = document.getElementById('catAge').value;
+    const origin = document.getElementById('catOrigin').value;
+    const gender = document.getElementById('catGender').value;
 
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/cats/${id}` : '/api/cats';
@@ -432,7 +438,7 @@ async function saveCat(event) {
         const response = await fetch(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, tag, descreption, img })
+            body: JSON.stringify({ name, tag, descreption, img, age, origin, gender })
         });
 
         if (response.ok) {
@@ -487,6 +493,9 @@ function openEditModal(cat) {
     document.getElementById('catName').value = cat.name;
     document.getElementById('catTag').value = cat.tag;
     document.getElementById('catDescreption').value = cat.descreption;
+    document.getElementById('catAge').value = cat.age || '';
+    document.getElementById('catOrigin').value = cat.origin || '';
+    document.getElementById('catGender').value = cat.gender || '';
 
     let imgUrl = cat.img;
     if (imgUrl && !imgUrl.includes('?')) {

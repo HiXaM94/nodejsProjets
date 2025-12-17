@@ -96,6 +96,25 @@
                 <label for="catTag">Tag</label>
                 <input type="text" id="catTag" name="tag" required>
 
+                <div style="display: flex; gap: 1rem;">
+                    <div style="flex: 1;">
+                        <label for="catAge">Age (Years)</label>
+                        <input type="number" id="catAge" name="age" min="0" placeholder="e.g. 2">
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="catGender">Gender</label>
+                        <select id="catGender" name="gender"
+                            style="width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 1rem;">
+                            <option value="">Unknown</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label for="catOrigin">Origin</label>
+                <input type="text" id="catOrigin" name="origin" placeholder="e.g. Siamese, Street Cat">
+
                 <label for="catDescreption">Description</label>
                 <textarea id="catDescreption" name="descreption" rows="3"></textarea>
 

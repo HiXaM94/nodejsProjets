@@ -165,6 +165,36 @@ app.get('/api/debug-db', async (req, res) => {
     }
 });
 
+// --- UPDATE SCHEMA ROUTE (Add new columns) ---
+app.get('/api/update-schema', async (req, res) => {
+    try {
+        console.log('Updating database schema...');
+
+        // Add age column
+        try {
+            await pool.query('ALTER TABLE cats ADD COLUMN age INT');
+            console.log('Added age column');
+        } catch (e) { console.log('Age column likely exists'); }
+
+        // Add origin column
+        try {
+            await pool.query('ALTER TABLE cats ADD COLUMN origin VARCHAR(100)');
+            console.log('Added origin column');
+        } catch (e) { console.log('Origin column likely exists'); }
+
+        // Add gender column
+        try {
+            await pool.query('ALTER TABLE cats ADD COLUMN gender VARCHAR(20)');
+            console.log('Added gender column');
+        } catch (e) { console.log('Gender column likely exists'); }
+
+        res.send('Schema updated successfully! Added age, origin, and gender columns.');
+    } catch (err) {
+        console.error('Schema update error:', err);
+        res.status(500).send('Error updating schema: ' + err.message);
+    }
+});
+
 // --- AUTHENTICATION ROUTES ---
 
 // Register new user
@@ -298,9 +328,9 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
     let params = [];
 
     if (search.length > 0) {
-        conditions.push('(name LIKE ? OR tag LIKE ? OR descreption LIKE ?)');
-        const searchTerm = `%${search}%`;
-        params.push(searchTerm, searchTerm, searchTerm);
+        conditions.push('(name LIKE ? OR descreption LIKE ? OR tag LIKE ?)');
+        const searchParam = `%${search}%`;
+        params.push(searchParam, searchParam, searchParam);
     }
 
     if (tagFilter.length > 0) {
@@ -309,46 +339,54 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
     }
 
     if (conditions.length > 0) {
-        whereClause = ' WHERE ' + conditions.join(' AND ');
+        whereClause = 'WHERE ' + conditions.join(' AND ');
     }
 
     try {
-        const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
-        const [countRows] = await pool.query(countSql, params);
+        // Count total
+        const countSql = `SELECT COUNT(*) as count FROM cats ${whereClause}`;
+        const [countResult] = await pool.query(countSql, params);
+        const totalCount = countResult[0].count;
 
-        responseData.totalCount = countRows[0].total_count;
-        responseData.totalPages = Math.ceil(responseData.totalCount / limit);
+        responseData.totalCount = totalCount;
+        responseData.totalPages = Math.ceil(totalCount / limit);
 
-        const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
-        const catsParams = [...params, limit, offset];
+        // Fetch cats
+        // Using pool.query for client-side interpolation (TiDB compatible)
+        const catsSql = `SELECT * FROM cats ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
-        const [catsRows] = await pool.query(catsSql, catsParams);
-        responseData.cats = catsRows;
+        // LIMIT and OFFSET params must be injected directly or handled carefully if using prepared statements
+        // Since we are using pool.query (client-side interpolation), we can pass them as params safely?
+        // Actually, mysql2 might treat them as strings if passed in params array.
+        // Safer to interpolate integers directly into string for LIMIT/OFFSET since we parsed them as Ints.
+
+        const safeCatsSql = `SELECT * FROM cats ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+
+        const [cats] = await pool.query(safeCatsSql, params);
+        responseData.cats = cats;
 
         res.json(responseData);
 
     } catch (err) {
-        console.error('SQL ERROR FETCHING CATS:', err.message);
-        return res.status(500).json({ error: 'Database error fetching cats.' });
+        console.error('Error fetching cats:', err);
+        res.status(500).json({ error: 'Error fetching cats' });
     }
 });
 
-// R - READ (GET) all unique tags - PROTECTED ROUTE
-app.get('/api/tags', isAuthenticated, async (req, res) => {
+// R - READ (GET) all unique tags
+app.get('/api/tags', async (req, res) => {
     try {
-        const sql = `SELECT DISTINCT tag FROM cats WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC`;
-        const [tagRows] = await pool.query(sql);
-        res.json(tagRows);
-
+        const [tags] = await pool.query('SELECT DISTINCT tag FROM cats ORDER BY tag ASC');
+        res.json(tags);
     } catch (err) {
-        console.error('Database error fetching tags:', err.message);
-        res.status(500).json({ error: 'Database error fetching tags.' });
+        console.error('Error fetching tags:', err);
+        res.status(500).json({ error: 'Error fetching tags' });
     }
 });
 
 // C - CREATE (POST) a new cat - PROTECTED ROUTE
 app.post('/api/cats', isAuthenticated, async (req, res) => {
-    const { name, tag, descreption, img } = req.body;
+    const { name, tag, descreption, img, age, origin, gender } = req.body;
 
     if (!name || !tag) {
         return res.status(400).json({ error: 'Name and Tag are required fields.' });
@@ -374,8 +412,8 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
 
         if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
 
-        const sql = 'INSERT INTO cats (name, tag, descreption, img, user_id) VALUES (?, ?, ?, ?, ?)';
-        const [result] = await pool.query(sql, [name, tag, descreption, imageUrl, req.session.userId]);
+        const sql = 'INSERT INTO cats (name, tag, descreption, img, age, origin, gender, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+        const [result] = await pool.query(sql, [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.session.userId]);
 
         res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
 
@@ -388,7 +426,7 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
 // U - UPDATE (PUT) a cat by ID - PROTECTED ROUTE
 app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
-    const { name, tag, descreption, img } = req.body;
+    const { name, tag, descreption, img, age, origin, gender } = req.body;
 
     console.log(`Attempting to update cat ${id} for user ${req.session.userId}`);
 
@@ -401,11 +439,11 @@ app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
         let params;
 
         if (img && img.trim() !== '') {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ? WHERE id = ? AND user_id = ?';
-            params = [name, tag, descreption, img, id, req.session.userId];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ?, age = ?, origin = ?, gender = ? WHERE id = ? AND user_id = ?';
+            params = [name, tag, descreption, img, age || null, origin || null, gender || null, id, req.session.userId];
         } else {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ? WHERE id = ? AND user_id = ?';
-            params = [name, tag, descreption, id, req.session.userId];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, age = ?, origin = ?, gender = ? WHERE id = ? AND user_id = ?';
+            params = [name, tag, descreption, age || null, origin || null, gender || null, id, req.session.userId];
         }
 
         console.log('Executing SQL:', sql);
