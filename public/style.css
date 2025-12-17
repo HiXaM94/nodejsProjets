@@ -331,44 +331,45 @@ body {
 
 .search-container input {
     width: 100%;
-    height: 52px;
-    /* fixed height for perfect alignment */
-    padding: 0 1.25rem 0 3.25rem;
-    /* icon on left */
+    height: 54px;
+    /* Slightly taller for modern feel */
+    padding: 0 1.5rem 0 3.5rem;
+    /* Balanced padding */
     border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 0.95rem;
+    border-radius: 14px;
+    font-size: 1rem;
     font-family: inherit;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     background-color: #f8fafc;
     color: var(--text-dark);
-}
-
-.search-container input::placeholder {
-    color: #94a3b8;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .search-container input:focus {
     outline: none;
     border-color: var(--primary-color);
     background-color: white;
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .search-input-icon {
     position: absolute;
-    left: 1.1rem;
+    left: 1.25rem;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(-50.5%);
+    /* Fine-tuned vertical centering */
     width: 20px;
     height: 20px;
     color: #64748b;
     pointer-events: none;
+    stroke-width: 2.5px;
+    /* Bolder, professional look */
 }
 
 .filter-wrapper {
     flex: 1;
-    min-width: 220px;
+    min-width: 240px;
+    /* Slightly wider for better text fit */
 }
 
 .filter-container {
@@ -379,23 +380,46 @@ body {
 
 .filter-container select {
     width: 100%;
-    height: 52px;
-    /* match input height perfectly */
-    padding: 0 2.5rem 0 3.25rem;
-    /* icon on left, arrow on right */
+    height: 54px;
+    /* Exact match with input */
+    padding: 0 2.75rem 0 3.5rem;
+    /* Precise balanced padding */
     border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 0.95rem;
+    border-radius: 14px;
+    font-size: 1rem;
     font-family: inherit;
     background-color: #f8fafc;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 1rem center;
-    background-size: 1em;
+    background-position: right 1.1rem center;
+    background-size: 1.1em;
     color: var(--text-dark);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.filter-container select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background-color: white;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.filter-input-icon {
+    position: absolute;
+    left: 1.25rem;
+    top: 50%;
+    transform: translateY(-50.5%);
+    /* Fine-tuned vertical centering */
+    width: 20px;
+    height: 20px;
+    color: #64748b;
+    pointer-events: none;
+    z-index: 5;
+    stroke-width: 2.5px;
+    /* Bolder, professional look */
 }
 
 .filter-container select:focus {
@@ -778,10 +802,17 @@ textarea:focus {
 }
 
 .section-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    display: inline-block;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
     animation: bounce 2s infinite;
+}
+
+.section-icon i {
+    width: 48px;
+    height: 48px;
+    stroke-width: 2px;
 }
 
 @keyframes bounce {
@@ -895,8 +926,16 @@ textarea:focus {
 }
 
 .contact-icon {
-    font-size: 2.5rem;
+    display: flex;
+    justify-content: center;
     margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+.contact-icon i {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2px;
 }
 
 .contact-form-section h2 {
