@@ -162,7 +162,7 @@ async function handleRegister(event) {
                 messageEl.textContent = '';
             }, 2000);
         } else {
-            messageEl.textContent = data.error || 'Registration failed';
+            messageEl.textContent = data.details ? (data.error + ': ' + data.details) : (data.error || 'Registration failed');
             messageEl.className = 'message error';
         }
     } catch (error) {
