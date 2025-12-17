@@ -155,6 +155,26 @@ app.get('/api/setup-db', async (req, res) => {
     }
 });
 
+// --- DEBUG ROUTE (Check table structure) ---
+app.get('/api/debug-db', async (req, res) => {
+    try {
+        const [rows] = await pool.query('DESCRIBE cats');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- DEBUG ROUTE (Check table structure) ---
+app.get('/api/debug-db', async (req, res) => {
+    try {
+        const [rows] = await pool.query('DESCRIBE cats');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- AUTHENTICATION ROUTES ---
 
 // Register new user
