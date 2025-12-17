@@ -492,7 +492,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginForm) loginForm.addEventListener('submit', handleLogin);
     if (registerForm) registerForm.addEventListener('submit', handleRegister);
 
+    // Setup modal close handlers
     setupModalCloseHandlers();
+
+    // Mobile Menu Toggle
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+
+    if (navToggle && navMenu) {
+        navToggle.addEventListener('click', () => {
+            navMenu.classList.toggle('open');
+            navToggle.classList.toggle('active');
+        });
+
+        // Close menu when clicking links
+        navMenu.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                navMenu.classList.remove('open');
+                navToggle.classList.remove('active');
+            });
+        });
+    }
+
+    // Fetch tags and cats (only if on gallery page)
     if (gallery) {
         if (tagFilterSelect) fetchAndPopulateTags();
         fetchCats();
