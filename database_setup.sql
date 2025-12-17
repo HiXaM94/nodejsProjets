@@ -66,8 +66,42 @@
         INDEX idx_created_at (created_at)
     );
 
+    -- ==========================================
+    -- NEW: Add columns for Age, Origin, Gender
+    -- ==========================================
+    
+    -- You can run these lines manually if the auto-update fails:
+    
+    -- ALTER TABLE cats ADD COLUMN age INT;
+    -- ALTER TABLE cats ADD COLUMN origin VARCHAR(100);
+    -- ALTER TABLE cats ADD COLUMN gender VARCHAR(20);
+
+    DELIMITER $$
+    CREATE PROCEDURE AddNewCatColumns()
+    BEGIN
+        -- Add age
+        IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_NAME = 'cats' AND COLUMN_NAME = 'age') THEN
+            ALTER TABLE cats ADD COLUMN age INT;
+        END IF;
+
+        -- Add origin
+        IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_NAME = 'cats' AND COLUMN_NAME = 'origin') THEN
+            ALTER TABLE cats ADD COLUMN origin VARCHAR(100);
+        END IF;
+
+        -- Add gender
+        IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_NAME = 'cats' AND COLUMN_NAME = 'gender') THEN
+            ALTER TABLE cats ADD COLUMN gender VARCHAR(20);
+        END IF;
+    END$$
+    DELIMITER ;
+
+    CALL AddNewCatColumns();
+    DROP PROCEDURE AddNewCatColumns();
+
     -- Display all tables
     SHOW TABLES;
 
     -- Display users table structure
     DESCRIBE users;
+    DESCRIBE cats;

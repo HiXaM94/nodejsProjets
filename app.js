@@ -167,31 +167,38 @@ app.get('/api/debug-db', async (req, res) => {
 
 // --- UPDATE SCHEMA ROUTE (Add new columns) ---
 app.get('/api/update-schema', async (req, res) => {
+    const results = [];
     try {
-        console.log('Updating database schema...');
+        console.log('Starting schema update...');
 
-        // Add age column
+        // 1. Age
         try {
             await pool.query('ALTER TABLE cats ADD COLUMN age INT');
-            console.log('Added age column');
-        } catch (e) { console.log('Age column likely exists'); }
+            results.push('Added age column');
+        } catch (e) {
+            results.push(`Age column error: ${e.message}`);
+        }
 
-        // Add origin column
+        // 2. Origin
         try {
             await pool.query('ALTER TABLE cats ADD COLUMN origin VARCHAR(100)');
-            console.log('Added origin column');
-        } catch (e) { console.log('Origin column likely exists'); }
+            results.push('Added origin column');
+        } catch (e) {
+            results.push(`Origin column error: ${e.message}`);
+        }
 
-        // Add gender column
+        // 3. Gender
         try {
             await pool.query('ALTER TABLE cats ADD COLUMN gender VARCHAR(20)');
-            console.log('Added gender column');
-        } catch (e) { console.log('Gender column likely exists'); }
+            results.push('Added gender column');
+        } catch (e) {
+            results.push(`Gender column error: ${e.message}`);
+        }
 
-        res.send('Schema updated successfully! Added age, origin, and gender columns.');
+        res.json({ message: 'Schema update attempted', results });
     } catch (err) {
-        console.error('Schema update error:', err);
-        res.status(500).send('Error updating schema: ' + err.message);
+        console.error('Schema update fatal error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -405,7 +412,12 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
         if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
 
         const sql = 'INSERT INTO cats (name, tag, descreption, img, age, origin, gender, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-        const [result] = await pool.query(sql, [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.session.userId]);
+        const params = [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.session.userId];
+
+        console.log('Executing INSERT:', sql);
+        console.log('Params:', params);
+
+        const [result] = await pool.query(sql, params);
 
         res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
 
