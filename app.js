@@ -125,6 +125,9 @@ app.get('/api/setup-db', async (req, res) => {
                 tag VARCHAR(50) NOT NULL,
                 descreption TEXT,
                 img VARCHAR(255),
+                age INT,
+                origin VARCHAR(100),
+                gender VARCHAR(20),
                 user_id INT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -150,14 +153,22 @@ app.get('/api/setup-db', async (req, res) => {
 // --- UPDATE SCHEMA ROUTE ---
 app.get('/api/update-schema', async (req, res) => {
     const results = [];
-    try {
-        try { await pool.query('ALTER TABLE cats ADD COLUMN age INT'); results.push('Added age'); } catch (e) { }
-        try { await pool.query('ALTER TABLE cats ADD COLUMN origin VARCHAR(100)'); results.push('Added origin'); } catch (e) { }
-        try { await pool.query('ALTER TABLE cats ADD COLUMN gender VARCHAR(20)'); results.push('Added gender'); } catch (e) { }
-        res.json({ message: 'Schema update attempted', results });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    const queries = [
+        { sql: 'ALTER TABLE cats ADD COLUMN age INT', label: 'Added age' },
+        { sql: 'ALTER TABLE cats ADD COLUMN origin VARCHAR(100)', label: 'Added origin' },
+        { sql: 'ALTER TABLE cats ADD COLUMN gender VARCHAR(20)', label: 'Added gender' },
+        { sql: 'ALTER TABLE cats ADD COLUMN user_id INT', label: 'Added user_id' }
+    ];
+
+    for (const q of queries) {
+        try {
+            await pool.query(q.sql);
+            results.push(`${q.label}: OK`);
+        } catch (e) {
+            results.push(`${q.label}: Skip (${e.code === 'ER_DUP_COLUMN_NAME' ? 'Exists' : e.message})`);
+        }
     }
+    res.json({ message: 'Schema update attempted', results });
 });
 
 // --- AUTHENTICATION ROUTES ---
@@ -259,7 +270,8 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
         await pool.query(sql, [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.session.userId]);
         res.status(201).json({ message: 'Cat created.' });
     } catch (err) {
-        res.status(500).json({ error: 'Error creating cat', details: err.message });
+        console.error('Error creating cat:', err);
+        res.status(500).json({ error: 'Error creating cat', details: err.message, message: 'Error creating cat: ' + err.message });
     }
 });
 
@@ -268,28 +280,33 @@ app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
     const { name, tag, descreption, img, age, origin, gender } = req.body;
     try {
         let sql, params;
+        // Allow update if the user is the owner OR the cat has no owner (NULL user_id)
+        // If it had no owner, this update will set the current user as the owner
         if (img) {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ?, age = ?, origin = ?, gender = ? WHERE id = ? AND user_id = ?';
-            params = [name, tag, descreption, img, age || null, origin || null, gender || null, id, req.session.userId];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ?, age = ?, origin = ?, gender = ?, user_id = ? WHERE id = ? AND (user_id = ? OR user_id IS NULL)';
+            params = [name, tag, descreption, img, age || null, origin || null, gender || null, req.session.userId, id, req.session.userId];
         } else {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, age = ?, origin = ?, gender = ? WHERE id = ? AND user_id = ?';
-            params = [name, tag, descreption, age || null, origin || null, gender || null, id, req.session.userId];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, age = ?, origin = ?, gender = ?, user_id = ? WHERE id = ? AND (user_id = ? OR user_id IS NULL)';
+            params = [name, tag, descreption, age || null, origin || null, gender || null, req.session.userId, id, req.session.userId];
         }
         const [result] = await pool.query(sql, params);
-        if (result.affectedRows === 0) return res.status(404).json({ message: 'Unauthorized or not found' });
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Unauthorized or cat not found', message: 'Unauthorized or cat not found' });
         res.json({ message: 'Cat updated.' });
     } catch (err) {
-        res.status(500).json({ error: 'Error updating cat', details: err.message });
+        console.error('Error updating cat:', err);
+        res.status(500).json({ error: 'Error updating cat', details: err.message, message: 'Error updating cat: ' + err.message });
     }
 });
 
 app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
     try {
-        const [result] = await pool.query('DELETE FROM cats WHERE id = ? AND user_id = ?', [req.params.id, req.session.userId]);
-        if (result.affectedRows === 0) return res.status(404).json({ message: 'Unauthorized or not found' });
+        // Allow delete if owner OR if no owner exists (legacy)
+        const [result] = await pool.query('DELETE FROM cats WHERE id = ? AND (user_id = ? OR user_id IS NULL)', [req.params.id, req.session.userId]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Unauthorized or cat not found', message: 'Unauthorized or cat not found' });
         res.json({ message: 'Cat deleted.' });
     } catch (err) {
-        res.status(500).json({ error: 'Error deleting cat' });
+        console.error('Error deleting cat:', err);
+        res.status(500).json({ error: 'Error deleting cat', details: err.message, message: 'Error deleting cat: ' + err.message });
     }
 });
 

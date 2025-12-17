@@ -291,18 +291,19 @@ body {
 /* ===== SEARCH & FILTER ===== */
 .search-filter-controls {
     background: white;
-    padding: 1.5rem 2rem;
-    margin: -2rem auto 2rem;
-    max-width: 1000px;
-    border-radius: 50px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    padding: 1.25rem;
+    margin: -2.5rem auto 2.5rem;
+    max-width: 950px;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 1.5rem;
-    /* Increased gap */
+    gap: 1rem;
     position: relative;
     z-index: 10;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px);
 }
 
 .search-container {
@@ -312,15 +313,16 @@ body {
 
 .search-container input {
     width: 100%;
-    padding: 1rem 3.5rem 1rem 1.5rem;
-    /* Icon on the right */
+    height: 54px;
+    padding: 0 4rem 0 1.5rem;
     border: 2px solid #e2e8f0;
-    border-radius: 50px;
+    border-radius: 12px;
     font-size: 1rem;
+    font-weight: 500;
     font-family: inherit;
-    /* Ensure font matches */
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     background-color: #f8fafc;
+    color: var(--text-dark);
 }
 
 .search-container input:focus {
@@ -332,13 +334,22 @@ body {
 
 .search-icon {
     position: absolute;
-    right: 1.5rem;
-    /* Moved back to right */
+    right: 1.25rem;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 1.3rem;
+    width: 1.25rem;
+    height: 1.25rem;
     color: #94a3b8;
     pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.search-container input:focus+.search-icon {
+    color: var(--primary-color);
+    transform: translateY(-50%) scale(1.1);
 }
 
 .filter-container {
@@ -351,20 +362,22 @@ body {
 
 .filter-container select {
     width: 100%;
-    padding: 1rem 1.5rem;
+    height: 54px;
+    padding: 0 3.5rem 0 1.25rem;
     border: 2px solid #e2e8f0;
-    border-radius: 50px;
+    border-radius: 12px;
     font-size: 1rem;
+    font-weight: 500;
     font-family: inherit;
-    /* Ensure font matches */
     background-color: #f8fafc;
+    color: var(--text-dark);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 1rem center;
-    background-size: 1em;
+    background-position: right 1.25rem center;
+    background-size: 1.2rem;
 }
 
 .filter-container select:focus {

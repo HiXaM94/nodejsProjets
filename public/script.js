@@ -30,14 +30,17 @@ async function checkAuthStatus() {
             currentUser = data.user;
             updateNavForUser(data.user);
             showAddCatButton();
+            return data.user;
         } else {
             updateNavForGuest();
             hideAddCatButton();
+            return null;
         }
     } catch (error) {
         console.error('Error checking auth status:', error);
         updateNavForGuest();
         hideAddCatButton();
+        return null;
     }
 }
 
@@ -160,9 +163,9 @@ async function handleLogin(event) {
             messageEl.textContent = 'Login successful!';
             messageEl.className = 'message success';
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 closeAuthModal();
-                checkAuthStatus(); // Update UI
+                await checkAuthStatus(); // Update UI and wait for it
 
                 // Reload data if on gallery page
                 if (document.getElementById('gallery')) {
@@ -360,6 +363,9 @@ function renderCats(cats) {
         catCard.className = 'cat-card';
         catCard.setAttribute('data-id', cat.id);
 
+        // Show actions only if user is logged in AND (is the owner OR cat has no owner)
+        const canManage = currentUser && (!cat.user_id || cat.user_id === currentUser.id);
+
         catCard.innerHTML = `
             <img src="${cat.img}" alt="${cat.name}">
             <div class="cat-info">
@@ -373,7 +379,7 @@ function renderCats(cats) {
                 </div>
 
                 <p>${cat.descreption || 'No description provided.'}</p>
-                ${currentUser ? `
+                ${canManage ? `
                 <div class="actions">
                     <button class="edit-btn" data-id="${cat.id}">Edit</button>
                     <button class="delete-btn" data-id="${cat.id}">Delete</button>
@@ -382,7 +388,7 @@ function renderCats(cats) {
             </div>
         `;
 
-        if (currentUser) {
+        if (canManage) {
             catCard.querySelector('.edit-btn').addEventListener('click', () => openEditModal(cat));
             catCard.querySelector('.delete-btn').addEventListener('click', () => deleteCat(cat.id));
         }
@@ -468,10 +474,12 @@ async function deleteCat(id) {
             fetchCats();
             fetchAndPopulateTags(); // Refresh tags
         } else {
-            alert('Failed to delete cat.');
+            const data = await response.json().catch(() => ({}));
+            alert(`Failed to delete cat: ${data.error || 'Unauthorized or server error'}`);
         }
     } catch (error) {
         console.error('Error deleting cat:', error);
+        alert('An unexpected error occurred.');
     }
 }
 
@@ -546,14 +554,14 @@ async function ensureSchema() {
 
 // ===== INITIALIZATION =====
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Gallery initialized');
 
     // Auto-fix schema on load
-    ensureSchema();
+    await ensureSchema();
 
-    // Check authentication
-    checkAuthStatus();
+    // Check authentication and WAIT for it
+    await checkAuthStatus();
 
     // Setup event listeners
     if (catForm) catForm.addEventListener('submit', saveCat);
