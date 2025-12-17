@@ -4,6 +4,7 @@ const fetch = require('node-fetch');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
+const MySQLStore = require('express-mysql-session')(session);
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -66,6 +67,15 @@ function getPool() {
 // Initialize pool
 pool = getPool();
 
+// --- Session Store Configuration ---
+// This saves sessions to the database so they survive server restarts (critical for Vercel)
+const sessionStore = new MySQLStore({
+    clearExpired: true,
+    checkExpirationInterval: 900000, // 15 minutes
+    expiration: ONE_HOUR,
+    createDatabaseTable: true // Automatically create the sessions table
+}, pool);
+
 // --- Middleware ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -73,7 +83,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Configure session middleware
 app.use(session({
+    key: 'session_cookie_name',
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this-in-production',
+    store: sessionStore, // Use the database store
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -187,7 +199,7 @@ app.post('/api/auth/logout', (req, res) => {
         if (err) {
             return res.status(500).json({ error: 'Error logging out.' });
         }
-        res.clearCookie('connect.sid');
+        res.clearCookie('session_cookie_name');
         res.json({ message: 'Logout successful!' });
     });
 });
