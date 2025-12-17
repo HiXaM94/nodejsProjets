@@ -352,14 +352,6 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
         responseData.totalPages = Math.ceil(totalCount / limit);
 
         // Fetch cats
-        // Using pool.query for client-side interpolation (TiDB compatible)
-        const catsSql = `SELECT * FROM cats ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
-
-        // LIMIT and OFFSET params must be injected directly or handled carefully if using prepared statements
-        // Since we are using pool.query (client-side interpolation), we can pass them as params safely?
-        // Actually, mysql2 might treat them as strings if passed in params array.
-        // Safer to interpolate integers directly into string for LIMIT/OFFSET since we parsed them as Ints.
-
         const safeCatsSql = `SELECT * FROM cats ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
         const [cats] = await pool.query(safeCatsSql, params);
@@ -419,7 +411,7 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
 
     } catch (err) {
         console.error('Database insertion error or Image fetch error:', err);
-        return res.status(500).json({ error: 'Error creating new cat or fetching image.' });
+        return res.status(500).json({ error: 'Error creating new cat.', details: err.message });
     }
 });
 
@@ -462,7 +454,7 @@ app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
 
     } catch (err) {
         console.error('Database update error:', err);
-        res.status(500).json({ error: 'Error updating cat.' });
+        res.status(500).json({ error: 'Error updating cat.', details: err.message });
     }
 });
 

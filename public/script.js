@@ -447,7 +447,7 @@ async function saveCat(event) {
             fetchAndPopulateTags(); // Refresh tags in case a new one was added
         } else {
             const data = await response.json();
-            alert(`Error: ${data.error || 'Failed to save cat'}`);
+            alert(`Error: ${data.error || 'Failed to save cat'}\nDetails: ${data.details || ''}`);
         }
     } catch (error) {
         console.error('Error saving cat:', error);
@@ -533,10 +533,24 @@ function setupModalCloseHandlers() {
     });
 }
 
+// Ensure Schema (Auto-fix database)
+async function ensureSchema() {
+    try {
+        console.log('Checking database schema...');
+        await fetch('/api/update-schema');
+        console.log('Database schema check complete.');
+    } catch (e) {
+        console.error('Schema check failed:', e);
+    }
+}
+
 // ===== INITIALIZATION =====
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Gallery initialized');
+
+    // Auto-fix schema on load
+    ensureSchema();
 
     // Check authentication
     checkAuthStatus();
