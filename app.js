@@ -69,7 +69,6 @@ function getPool() {
 pool = getPool();
 
 // --- Session Store Configuration ---
-// This saves sessions to the database so they survive server restarts (critical for Vercel)
 const sessionStore = new MySQLStore({
     clearExpired: true,
     checkExpirationInterval: 900000, // 15 minutes
@@ -93,7 +92,7 @@ app.use(session({
         secure: process.env.NODE_ENV === 'production', // True in production (HTTPS)
         httpOnly: true,
         maxAge: ONE_HOUR,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Important for cross-site cookies if needed, or 'lax' is fine usually
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     }
 }));
 
@@ -105,12 +104,10 @@ const isAuthenticated = (req, res, next) => {
     return res.status(401).json({ error: 'Unauthorized. Please login to view this content.' });
 };
 
-// --- SETUP ROUTE (Run once to fix database) ---
+// --- SETUP ROUTE ---
 app.get('/api/setup-db', async (req, res) => {
     try {
         console.log('Running database setup...');
-
-        // 1. Create Users Table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id INT PRIMARY KEY AUTO_INCREMENT,
@@ -121,8 +118,6 @@ app.get('/api/setup-db', async (req, res) => {
                 last_login DATETIME
             )
         `);
-
-        // 2. Create Cats Table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS cats (
                 id INT PRIMARY KEY AUTO_INCREMENT,
@@ -135,8 +130,6 @@ app.get('/api/setup-db', async (req, res) => {
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         `);
-
-        // 3. Create Contact Messages Table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS contact_messages (
                 id INT PRIMARY KEY AUTO_INCREMENT,
@@ -147,7 +140,6 @@ app.get('/api/setup-db', async (req, res) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
-
         res.send('<h1>Database Setup Complete! ✅</h1><p>Tables created successfully. <a href="/">Go back to Home</a></p>');
     } catch (err) {
         console.error('Setup error:', err);
@@ -155,7 +147,7 @@ app.get('/api/setup-db', async (req, res) => {
     }
 });
 
-// --- DEBUG ROUTE (Check table structure) ---
+// --- DEBUG ROUTE ---
 app.get('/api/debug-db', async (req, res) => {
     try {
         const [rows] = await pool.query('DESCRIBE cats');
@@ -165,170 +157,85 @@ app.get('/api/debug-db', async (req, res) => {
     }
 });
 
-// --- UPDATE SCHEMA ROUTE (Add new columns) ---
+// --- UPDATE SCHEMA ROUTE ---
 app.get('/api/update-schema', async (req, res) => {
     const results = [];
     try {
-        console.log('Starting schema update...');
-
-        // 1. Age
         try {
             await pool.query('ALTER TABLE cats ADD COLUMN age INT');
             results.push('Added age column');
-        } catch (e) {
-            results.push(`Age column error: ${e.message}`);
-        }
-
-        // 2. Origin
+        } catch (e) { results.push(`Age column error: ${e.message}`); }
         try {
             await pool.query('ALTER TABLE cats ADD COLUMN origin VARCHAR(100)');
             results.push('Added origin column');
-        } catch (e) {
-            results.push(`Origin column error: ${e.message}`);
-        }
-
-        // 3. Gender
+        } catch (e) { results.push(`Origin column error: ${e.message}`); }
         try {
             await pool.query('ALTER TABLE cats ADD COLUMN gender VARCHAR(20)');
             results.push('Added gender column');
-        } catch (e) {
-            results.push(`Gender column error: ${e.message}`);
-        }
-
+        } catch (e) { results.push(`Gender column error: ${e.message}`); }
         res.json({ message: 'Schema update attempted', results });
     } catch (err) {
-        console.error('Schema update fatal error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
 // --- AUTHENTICATION ROUTES ---
-
-// Register new user
 app.post('/api/auth/register', async (req, res) => {
     const { username, password, email } = req.body;
-
-    console.log('Registration request received:', { username, email });
-
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required.' });
-    }
-
-    if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-    }
-
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     try {
-        // Check if username already exists
-        const checkSql = 'SELECT id FROM users WHERE username = ?';
-        const [existingUsers] = await pool.query(checkSql, [username]);
-
-        if (existingUsers.length > 0) {
-            return res.status(409).json({ error: 'Username already exists.' });
-        }
-
-        // Hash password
+        const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+        if (existingUsers.length > 0) return res.status(409).json({ error: 'Username already exists.' });
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-
-        // Insert new user
-        const insertSql = 'INSERT INTO users (username, password, email) VALUES (?, ?, ?)';
-        const [result] = await pool.query(insertSql, [username, hashedPassword, email || null]);
-
-        console.log('User registered successfully:', result.insertId);
-
-        res.status(201).json({
-            message: 'User registered successfully!',
-            userId: result.insertId
-        });
-
+        const [result] = await pool.query('INSERT INTO users (username, password, email) VALUES (?, ?, ?)', [username, hashedPassword, email || null]);
+        res.status(201).json({ message: 'User registered successfully!', userId: result.insertId });
     } catch (err) {
-        console.error('Registration error:', err.message);
-        console.error('Error stack:', err.stack);
         res.status(500).json({ error: 'Error registering user.', details: err.message });
     }
 });
 
-// Login user
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
-
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required.' });
-    }
-
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
     try {
-        // Find user
-        const sql = 'SELECT id, username, password FROM users WHERE username = ?';
-        const [users] = await pool.query(sql, [username]);
-
-        if (users.length === 0) {
-            return res.status(401).json({ error: 'Invalid username or password.' });
-        }
-
+        const [users] = await pool.query('SELECT id, username, password FROM users WHERE username = ?', [username]);
+        if (users.length === 0) return res.status(401).json({ error: 'Invalid username or password.' });
         const user = users[0];
-
-        // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password);
-
-        if (!isValidPassword) {
-            return res.status(401).json({ error: 'Invalid username or password.' });
-        }
-
-        // Create session
+        if (!isValidPassword) return res.status(401).json({ error: 'Invalid username or password.' });
         req.session.userId = user.id;
         req.session.username = user.username;
-
-        // Update last login
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
-
-        res.json({
-            message: 'Login successful!',
-            user: { id: user.id, username: user.username }
-        });
-
+        res.json({ message: 'Login successful!', user: { id: user.id, username: user.username } });
     } catch (err) {
-        console.error('Login error:', err);
         res.status(500).json({ error: 'Error during login.' });
     }
 });
 
-// Logout user
 app.post('/api/auth/logout', (req, res) => {
     req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error logging out.' });
-        }
+        if (err) return res.status(500).json({ error: 'Error logging out.' });
         res.clearCookie('session_cookie_name');
         res.json({ message: 'Logout successful!' });
     });
 });
 
-// Check session status
 app.get('/api/auth/status', (req, res) => {
     if (req.session && req.session.userId) {
-        res.json({
-            authenticated: true,
-            user: { id: req.session.userId, username: req.session.username }
-        });
+        res.json({ authenticated: true, user: { id: req.session.userId, username: req.session.username } });
     } else {
         res.json({ authenticated: false });
     }
 });
 
 // --- CATS CRUD ROUTES ---
-
-// R - READ (GET) all cats with Search, Tag Filter, and Pagination - PROTECTED ROUTE
 app.get('/api/cats', isAuthenticated, async (req, res) => {
     const limit = parseInt(req.query.limit) || 8;
     const page = parseInt(req.query.page) || 1;
     const search = req.query.search ? req.query.search.toString().trim() : '';
     const tagFilter = req.query.tagFilter ? req.query.tagFilter.toString().trim() : '';
-
     const offset = (page - 1) * limit;
-
-    const responseData = {
-        cats: [], totalCount: 0, totalPages: 0, currentPage: page, limit: limit
-    };
 
     let whereClause = '';
     let conditions = [];
@@ -339,67 +246,39 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
         const searchParam = `%${search}%`;
         params.push(searchParam, searchParam, searchParam);
     }
-
     if (tagFilter.length > 0) {
         conditions.push('tag = ?');
         params.push(tagFilter);
     }
-
-    if (conditions.length > 0) {
-        whereClause = 'WHERE ' + conditions.join(' AND ');
-    }
+    if (conditions.length > 0) whereClause = 'WHERE ' + conditions.join(' AND ');
 
     try {
-        // Count total
-        const countSql = `SELECT COUNT(*) as count FROM cats ${whereClause}`;
-        const [countResult] = await pool.query(countSql, params);
+        const [countResult] = await pool.query(`SELECT COUNT(*) as count FROM cats ${whereClause}`, params);
         const totalCount = countResult[0].count;
-
-        responseData.totalCount = totalCount;
-        responseData.totalPages = Math.ceil(totalCount / limit);
-
-        // Fetch cats
-        const safeCatsSql = `SELECT * FROM cats ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
-
-        const [cats] = await pool.query(safeCatsSql, params);
-        responseData.cats = cats;
-
-        res.json(responseData);
-
+        const [cats] = await pool.query(`SELECT * FROM cats ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`, params);
+        res.json({ cats, totalCount, totalPages: Math.ceil(totalCount / limit), currentPage: page, limit });
     } catch (err) {
-        console.error('Error fetching cats:', err);
         res.status(500).json({ error: 'Error fetching cats' });
     }
 });
 
-// R - READ (GET) all unique tags
 app.get('/api/tags', async (req, res) => {
     try {
         const [tags] = await pool.query('SELECT DISTINCT tag FROM cats ORDER BY tag ASC');
         res.json(tags);
     } catch (err) {
-        console.error('Error fetching tags:', err);
         res.status(500).json({ error: 'Error fetching tags' });
     }
 });
 
-// C - CREATE (POST) a new cat - PROTECTED ROUTE
 app.post('/api/cats', isAuthenticated, async (req, res) => {
     const { name, tag, descreption, img, age, origin, gender } = req.body;
-
-    if (!name || !tag) {
-        return res.status(400).json({ error: 'Name and Tag are required fields.' });
-    }
-
+    if (!name || !tag) return res.status(400).json({ error: 'Name and Tag are required fields.' });
     let imageUrl = img;
-
     try {
         if (!imageUrl || imageUrl.trim() === '') {
-            const cataasBaseUrl = 'https://cataas.com/cat';
-            const uniqueUrl = `${cataasBaseUrl}?_ts=${Date.now()}`;
-
+            const uniqueUrl = `https://cataas.com/cat?_ts=${Date.now()}`;
             const imageResponse = await fetch(uniqueUrl, { redirect: 'manual' });
-
             if (imageResponse.status === 302 || imageResponse.status === 307) {
                 imageUrl = imageResponse.headers.get('location');
             } else if (imageResponse.ok && imageResponse.url) {
@@ -408,84 +287,48 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
                 imageUrl = '/placeholder.jpg';
             }
         }
-
-        if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
-
         const sql = 'INSERT INTO cats (name, tag, descreption, img, age, origin, gender, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-        const params = [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.session.userId];
-
-        console.log('Executing INSERT:', sql);
-        console.log('Params:', params);
-
-        const [result] = await pool.query(sql, params);
-
+        const [result] = await pool.query(sql, [name, tag, descreption, imageUrl || '/placeholder.jpg', age || null, origin || null, gender || null, req.session.userId]);
         res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
-
     } catch (err) {
-        console.error('Database insertion error or Image fetch error:', err);
-        return res.status(500).json({ error: 'Error creating new cat.', details: err.message });
+        res.status(500).json({ error: 'Error creating new cat.', details: err.message });
     }
 });
 
-// U - UPDATE (PUT) a cat by ID - PROTECTED ROUTE
 app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     const { name, tag, descreption, img, age, origin, gender } = req.body;
-
-    console.log(`Attempting to update cat ${id} for user ${req.session.userId}`);
-
-    if (!name || !tag) {
-        return res.status(400).json({ error: 'Name and Tag are required fields.' });
-    }
-
+    if (!name || !tag) return res.status(400).json({ error: 'Name and Tag are required fields.' });
     try {
-        let sql;
-        let params;
+        // Ownership check
+        const [cats] = await pool.query('SELECT user_id FROM cats WHERE id = ?', [id]);
+        if (cats.length === 0) return res.status(404).json({ message: 'Cat not found.' });
+        if (cats[0].user_id !== req.session.userId) return res.status(403).json({ message: 'You are not authorized to update this cat.' });
 
+        let sql, params;
         if (img && img.trim() !== '') {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ?, age = ?, origin = ?, gender = ? WHERE id = ? AND user_id = ?';
-            params = [name, tag, descreption, img, age || null, origin || null, gender || null, id, req.session.userId];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ?, age = ?, origin = ?, gender = ? WHERE id = ?';
+            params = [name, tag, descreption, img, age || null, origin || null, gender || null, id];
         } else {
-            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, age = ?, origin = ?, gender = ? WHERE id = ? AND user_id = ?';
-            params = [name, tag, descreption, age || null, origin || null, gender || null, id, req.session.userId];
+            sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, age = ?, origin = ?, gender = ? WHERE id = ?';
+            params = [name, tag, descreption, age || null, origin || null, gender || null, id];
         }
-
-        console.log('Executing SQL:', sql);
-        console.log('With params:', params);
-
-        const [result] = await pool.query(sql, params);
-
-        console.log('Update result:', result);
-
-        if (result.affectedRows === 0) {
-            console.log('No rows affected. Cat not found or user mismatch.');
-            return res.status(404).json({ message: 'Cat not found or unauthorized.' });
-        }
-
+        await pool.query(sql, params);
         res.json({ message: 'Cat updated successfully.' });
-
     } catch (err) {
-        console.error('Database update error:', err);
         res.status(500).json({ error: 'Error updating cat.', details: err.message });
     }
 });
 
-// D - DELETE (DELETE) a cat by ID - PROTECTED ROUTE
 app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
-
     try {
-        const sql = 'DELETE FROM cats WHERE id = ? AND user_id = ?';
-        const [result] = await pool.query(sql, [id, req.session.userId]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Cat not found or unauthorized.' });
-        }
-
+        const [cats] = await pool.query('SELECT user_id FROM cats WHERE id = ?', [id]);
+        if (cats.length === 0) return res.status(404).json({ message: 'Cat not found.' });
+        if (cats[0].user_id !== req.session.userId) return res.status(403).json({ message: 'You are not authorized to delete this cat.' });
+        await pool.query('DELETE FROM cats WHERE id = ?', [id]);
         res.json({ message: 'Cat deleted successfully.' });
-
     } catch (err) {
-        console.error('Database delete error:', err);
         res.status(500).json({ error: 'Error deleting cat.' });
     }
 });
@@ -493,40 +336,22 @@ app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
 // --- CONTACT FORM ROUTE ---
 app.post('/api/contact', async (req, res) => {
     const { name, email, subject, message } = req.body;
-
-    if (!name || !email || !message) {
-        return res.status(400).json({ error: 'Name, email, and message are required.' });
-    }
-
+    if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required.' });
     try {
-        const sql = 'INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())';
-        await pool.query(sql, [name, email, subject || '', message]);
-
+        await pool.query('INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())', [name, email, subject || '', message]);
         res.json({ message: 'Message sent successfully! We will get back to you soon.' });
     } catch (err) {
-        console.error('Contact form error:', err);
         res.status(500).json({ error: 'Error sending message.' });
     }
 });
 
 // --- SERVE STATIC PAGES ---
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')));
+app.get('/contact', (req, res) => res.sendFile(path.join(__dirname, 'public', 'contact.html')));
 
-app.get('/about', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'about.html'));
-});
-
-app.get('/contact', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'contact.html'));
-});
-
-// --- Server Start ---
 if (require.main === module) {
-    app.listen(port, () => {
-        console.log(`Server running at http://localhost:${port}`);
-    });
+    app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
 }
 
 module.exports = app;
