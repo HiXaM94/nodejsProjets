@@ -7,6 +7,7 @@ const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
 
 const app = express();
+app.set('trust proxy', 1); // Required for Vercel/Heroku secure cookies
 const port = process.env.PORT || 3000;
 const ONE_HOUR = 1000 * 60 * 60;
 const SALT_ROUNDS = 10;
@@ -91,7 +92,8 @@ app.use(session({
     cookie: {
         secure: process.env.NODE_ENV === 'production', // True in production (HTTPS)
         httpOnly: true,
-        maxAge: ONE_HOUR
+        maxAge: ONE_HOUR,
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Important for cross-site cookies if needed, or 'lax' is fine usually
     }
 }));
 
