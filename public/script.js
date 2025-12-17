@@ -103,16 +103,24 @@ function hideAddCatButton() {
     }
 }
 
-// Open authentication modal
+// ===== MODAL FUNCTIONS =====
+
 function openAuthModal(mode = 'login') {
     if (!authModal) return;
+
+    authModal.style.display = 'block';
 
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const showLoginBtn = document.getElementById('showLoginBtn');
     const showRegisterBtn = document.getElementById('showRegisterBtn');
+    const messageEls = document.querySelectorAll('.message');
 
-    authModal.style.display = 'block';
+    // Clear messages
+    messageEls.forEach(el => {
+        el.textContent = '';
+        el.className = 'message';
+    });
 
     if (mode === 'login') {
         loginForm.style.display = 'block';
@@ -127,48 +135,8 @@ function openAuthModal(mode = 'login') {
     }
 }
 
-// Close authentication modal
 function closeAuthModal() {
-    if (authModal) {
-        authModal.style.display = 'none';
-    }
-}
-
-// Handle registration
-async function handleRegister(event) {
-    event.preventDefault();
-
-    const username = document.getElementById('regUsername').value;
-    const email = document.getElementById('regEmail').value;
-    const password = document.getElementById('regPassword').value;
-    const messageEl = document.getElementById('registerMessage');
-
-    try {
-        const response = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, password })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            messageEl.textContent = data.message;
-            messageEl.className = 'message success';
-            document.getElementById('registerForm').reset();
-
-            setTimeout(() => {
-                openAuthModal('login');
-                messageEl.textContent = '';
-            }, 2000);
-        } else {
-            messageEl.textContent = data.details ? (data.error + ': ' + data.details) : (data.error || 'Registration failed');
-            messageEl.className = 'message error';
-        }
-    } catch (error) {
-        messageEl.textContent = 'Network error. Please try again.';
-        messageEl.className = 'message error';
-    }
+    if (authModal) authModal.style.display = 'none';
 }
 
 // Handle login
@@ -189,20 +157,62 @@ async function handleLogin(event) {
         const data = await response.json();
 
         if (response.ok) {
-            messageEl.textContent = data.message;
+            messageEl.textContent = 'Login successful!';
             messageEl.className = 'message success';
-            currentUser = data.user;
-            document.getElementById('loginForm').reset();
 
             setTimeout(() => {
                 closeAuthModal();
-                updateNavForUser(data.user);
-                showAddCatButton();
-                messageEl.textContent = '';
-                fetchCats(); // Reload cats after login
+                checkAuthStatus(); // Update UI
+
+                // Reload data if on gallery page
+                if (document.getElementById('gallery')) {
+                    fetchCats();
+                    if (tagFilterSelect) fetchAndPopulateTags();
+                } else {
+                    // Reload page if on other pages to update nav
+                    window.location.reload();
+                }
             }, 1000);
         } else {
             messageEl.textContent = data.error || 'Login failed';
+            messageEl.className = 'message error';
+        }
+    } catch (error) {
+        messageEl.textContent = 'Network error. Please try again.';
+        messageEl.className = 'message error';
+    }
+}
+
+// Handle register
+async function handleRegister(event) {
+    event.preventDefault();
+
+    const username = document.getElementById('regUsername').value;
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPassword').value;
+    const messageEl = document.getElementById('registerMessage');
+
+    try {
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageEl.textContent = 'Registration successful! Please login.';
+            messageEl.className = 'message success';
+
+            setTimeout(() => {
+                openAuthModal('login');
+            }, 1500);
+        } else {
+            messageEl.textContent = data.error || 'Registration failed';
+            if (data.details) {
+                messageEl.textContent += ` (${data.details})`;
+            }
             messageEl.className = 'message error';
         }
     } catch (error) {
@@ -234,6 +244,8 @@ async function handleLogout() {
 
 // Fetch cats from API
 async function fetchCats() {
+    if (!gallery) return; // Safety check
+
     gallery.innerHTML = '<h2 style="text-align: center; padding: 3rem;">Loading cats...</h2>';
     const paginationDiv = document.getElementById('pagination');
     if (paginationDiv) paginationDiv.style.display = 'none';
@@ -268,7 +280,8 @@ async function fetchCats() {
         }
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
 
@@ -277,33 +290,38 @@ async function fetchCats() {
 
     } catch (error) {
         console.error('Fetch error:', error);
-        gallery.innerHTML = '<h2 style="text-align: center; padding: 3rem;">Failed to load cats. Please try again.</h2>';
+        gallery.innerHTML = `<div style="text-align: center; padding: 3rem; color: red;">
+            <h2>Failed to load cats.</h2>
+            <p>${error.message}</p>
+        </div>`;
     }
 }
 
 // Fetch and populate tags
 async function fetchAndPopulateTags() {
+    if (!tagFilterSelect) return;
+
     try {
         const response = await fetch('/api/tags');
         if (!response.ok) return; // Silently fail if not authenticated
         const tags = await response.json();
 
-        if (tagFilterSelect) {
-            tagFilterSelect.innerHTML = '<option value="">-- Show All Tags --</option>';
+        tagFilterSelect.innerHTML = '<option value="">-- Show All Tags --</option>';
 
-            tags.forEach(tag => {
-                const option = document.createElement('option');
-                option.value = tag.tag;
-                option.textContent = tag.tag;
-                tagFilterSelect.appendChild(option);
-            });
+        tags.forEach(tag => {
+            const option = document.createElement('option');
+            option.value = tag.tag;
+            option.textContent = tag.tag;
+            tagFilterSelect.appendChild(option);
+        });
 
-            tagFilterSelect.addEventListener('change', () => {
-                currentTagFilter = tagFilterSelect.value;
-                currentPage = 1;
-                fetchCats();
-            });
+        if (currentTagFilter) {
+            tagFilterSelect.value = currentTagFilter;
         }
+
+        // Add event listener only once (check if already added?)
+        // Actually, replacing innerHTML removes listeners on options, but not on select.
+        // The listener is added in init.
 
     } catch (error) {
         console.error('Error fetching tags:', error);
@@ -328,6 +346,7 @@ function handleAutoSearch() {
 
 // Render cat cards
 function renderCats(cats) {
+    if (!gallery) return;
     gallery.innerHTML = '';
 
     if (cats.length === 0) {
@@ -400,17 +419,11 @@ function renderPagination(page, totalPages, totalCount) {
 async function saveCat(event) {
     event.preventDefault();
 
-    if (!currentUser) {
-        alert('You must be logged in to perform this action.');
-        openAuthModal('login');
-        return;
-    }
-
     const id = document.getElementById('catId').value;
     const name = document.getElementById('catName').value;
     const tag = document.getElementById('catTag').value;
     const descreption = document.getElementById('catDescreption').value;
-    const img = catImgUrlInput.value;
+    const img = document.getElementById('catImgUrl').value;
 
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/cats/${id}` : '/api/cats';
@@ -422,81 +435,54 @@ async function saveCat(event) {
             body: JSON.stringify({ name, tag, descreption, img })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Server error: ${response.statusText}`);
+        if (response.ok) {
+            modal.style.display = 'none';
+            fetchCats();
+            fetchAndPopulateTags(); // Refresh tags in case a new one was added
+        } else {
+            const data = await response.json();
+            alert(`Error: ${data.error || 'Failed to save cat'}`);
         }
-
-        modal.style.display = 'none';
-        catForm.reset();
-
-        currentPage = 1;
-        currentSearch = '';
-        if (searchInput) searchInput.value = '';
-        fetchCats();
-
     } catch (error) {
         console.error('Error saving cat:', error);
-        alert(`Failed to save cat: ${error.message}`);
+        alert('Network error. Please try again.');
     }
 }
 
 // Delete cat
 async function deleteCat(id) {
-    if (!currentUser) {
-        alert('You must be logged in to perform this action.');
-        openAuthModal('login');
-        return;
-    }
-
-    if (!confirm('Are you sure you want to delete this cat?')) {
-        return;
-    }
+    if (!confirm('Are you sure you want to delete this cat?')) return;
 
     try {
         const response = await fetch(`/api/cats/${id}`, {
             method: 'DELETE'
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Server error: ${response.statusText}`);
+        if (response.ok) {
+            fetchCats();
+            fetchAndPopulateTags(); // Refresh tags
+        } else {
+            alert('Failed to delete cat.');
         }
-
-        fetchCats();
-
     } catch (error) {
         console.error('Error deleting cat:', error);
-        alert(`Failed to delete cat: ${error.message}`);
     }
 }
 
-// ===== MODAL HANDLERS =====
-
-// Open add modal
+// Open Add Modal
 function openAddModal() {
-    if (!currentUser) {
-        alert('Please login to add cats.');
-        openAuthModal('login');
-        return;
-    }
-
+    if (!modal) return;
     modalTitle.textContent = 'Add New Cat';
     catForm.reset();
     document.getElementById('catId').value = '';
-    catImgUrlInput.value = '';
     modal.style.display = 'block';
 }
 
-// Open edit modal
+// Open Edit Modal
 function openEditModal(cat) {
-    if (!currentUser) {
-        alert('Please login to edit cats.');
-        openAuthModal('login');
-        return;
-    }
+    if (!modal) return;
+    modalTitle.textContent = 'Edit Cat';
 
-    modalTitle.textContent = `Edit ${cat.name}`;
     document.getElementById('catId').value = cat.id;
     document.getElementById('catName').value = cat.name;
     document.getElementById('catTag').value = cat.tag;
@@ -550,6 +536,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (catForm) catForm.addEventListener('submit', saveCat);
     if (searchInput) searchInput.addEventListener('keyup', handleAutoSearch);
 
+    if (tagFilterSelect) {
+        tagFilterSelect.addEventListener('change', () => {
+            currentTagFilter = tagFilterSelect.value;
+            currentPage = 1;
+            fetchCats();
+        });
+    }
+
     // Setup auth toggle buttons
     const showLoginBtn = document.getElementById('showLoginBtn');
     const showRegisterBtn = document.getElementById('showRegisterBtn');
@@ -577,9 +571,58 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup modal close handlers
     setupModalCloseHandlers();
 
-    // Fetch tags and cats
-    if (tagFilterSelect) fetchAndPopulateTags();
-    fetchCats();
+    // Fetch tags and cats (only if on gallery page)
+    if (gallery) {
+        if (tagFilterSelect) fetchAndPopulateTags();
+        fetchCats();
+    }
+
+    // Contact Form Logic (Merged from contact.js)
+    const contactForm = document.getElementById('contactForm');
+    if (contactForm) {
+        contactForm.addEventListener('submit', handleContactSubmit);
+    }
 
     console.log('All event listeners attached');
 });
+
+// Contact Form Handler
+async function handleContactSubmit(event) {
+    event.preventDefault();
+
+    const name = document.getElementById('contactName').value;
+    const email = document.getElementById('contactEmail').value;
+    const subject = document.getElementById('contactSubject').value;
+    const message = document.getElementById('contactMessage').value;
+    const messageEl = document.getElementById('contactFormMessage');
+
+    // Basic validation
+    if (!name || !email || !message) {
+        messageEl.textContent = 'Please fill in all required fields.';
+        messageEl.className = 'message error';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, subject, message })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageEl.textContent = data.message;
+            messageEl.className = 'message success';
+            contactForm.reset();
+        } else {
+            messageEl.textContent = data.error || 'Failed to send message.';
+            messageEl.className = 'message error';
+        }
+    } catch (error) {
+        console.error('Contact error:', error);
+        messageEl.textContent = 'Network error.';
+        messageEl.className = 'message error';
+    }
+}
