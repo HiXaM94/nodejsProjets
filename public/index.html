@@ -20,7 +20,7 @@
                 <span class="logo-icon">🐱</span>
                 <span class="logo-text">CatsGallery</span>
             </a>
-            
+
             <div class="nav-menu" id="navMenu">
                 <a href="/" class="nav-link active" data-page="home">
                     <span class="nav-icon">🏠</span>
@@ -35,13 +35,13 @@
                     Contact
                 </a>
             </div>
-            
+
             <div class="nav-auth" id="navAuth">
                 <!-- Will be populated by JavaScript -->
                 <button id="loginBtn" class="btn btn-outline">Login</button>
                 <button id="registerBtn" class="btn btn-primary">Register</button>
             </div>
-            
+
             <button class="nav-toggle" id="navToggle">
                 <span></span>
                 <span></span>
@@ -57,21 +57,17 @@
         </div>
     </header>
 
+    <!-- Horizontal Search & Filter Section -->
     <div class="search-filter-controls">
-        <div class="search-row-wrapper">
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search by name, tag, or description...">
-                <span class="search-icon">🔍</span>
-            </div>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search cats...">
+            <span class="search-icon">🔍</span>
         </div>
-        
-        <div class="filter-row-wrapper">
-            <div class="filter-container">
-                <label for="tagFilterSelect">Filter by Tag:</label>
-                <select id="tagFilterSelect">
-                    <option value="">-- Show All Tags --</option>
-                </select>
-            </div>
+
+        <div class="filter-container">
+            <select id="tagFilterSelect">
+                <option value="">All Tags</option>
+            </select>
         </div>
     </div>
 
@@ -116,7 +112,7 @@
     <div id="authModal" class="modal">
         <div class="modal-content auth-modal-content">
             <span class="close-btn" onclick="closeAuthModal()">&times;</span>
-            
+
             <h2 class="auth-title">User Authentication</h2>
 
             <div class="auth-toggle">
