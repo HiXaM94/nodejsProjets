@@ -536,14 +536,20 @@ body {
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(5px);
     animation: fadeIn 0.3s ease;
+    overflow-y: auto;
+    /* Allow scrolling */
+    padding: 1rem;
+    /* Prevent edge touching */
 }
 
 .modal-content {
     background: white;
-    margin: 5% auto;
+    margin: 2rem auto;
+    /* Center with margin */
     padding: 2.5rem;
     border-radius: var(--radius-lg);
     max-width: 500px;
+    width: 100%;
     box-shadow: var(--shadow-xl);
     animation: slideDown 0.3s ease;
     position: relative;
