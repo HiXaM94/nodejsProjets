@@ -129,8 +129,45 @@ body {
 
 .nav-auth {
     display: flex;
-    gap: 0.75rem;
+    gap: 1rem;
     align-items: center;
+}
+
+/* User Display Styles (Cat Themed) */
+.user-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    border: 1px solid rgba(236, 72, 153, 0.2);
+    transition: var(--transition);
+}
+
+.user-display:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(236, 72, 153, 0.15));
+    transform: translateY(-1px);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.username {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.95rem;
 }
 
 .nav-toggle {
