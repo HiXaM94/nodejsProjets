@@ -165,16 +165,6 @@ app.get('/api/debug-db', async (req, res) => {
     }
 });
 
-// --- DEBUG ROUTE (Check table structure) ---
-app.get('/api/debug-db', async (req, res) => {
-    try {
-        const [rows] = await pool.query('DESCRIBE cats');
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // --- AUTHENTICATION ROUTES ---
 
 // Register new user
@@ -194,7 +184,7 @@ app.post('/api/auth/register', async (req, res) => {
     try {
         // Check if username already exists
         const checkSql = 'SELECT id FROM users WHERE username = ?';
-        const [existingUsers] = await pool.execute(checkSql, [username]);
+        const [existingUsers] = await pool.query(checkSql, [username]);
 
         if (existingUsers.length > 0) {
             return res.status(409).json({ error: 'Username already exists.' });
@@ -205,7 +195,7 @@ app.post('/api/auth/register', async (req, res) => {
 
         // Insert new user
         const insertSql = 'INSERT INTO users (username, password, email) VALUES (?, ?, ?)';
-        const [result] = await pool.execute(insertSql, [username, hashedPassword, email || null]);
+        const [result] = await pool.query(insertSql, [username, hashedPassword, email || null]);
 
         console.log('User registered successfully:', result.insertId);
 
@@ -232,7 +222,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         // Find user
         const sql = 'SELECT id, username, password FROM users WHERE username = ?';
-        const [users] = await pool.execute(sql, [username]);
+        const [users] = await pool.query(sql, [username]);
 
         if (users.length === 0) {
             return res.status(401).json({ error: 'Invalid username or password.' });
@@ -252,7 +242,7 @@ app.post('/api/auth/login', async (req, res) => {
         req.session.username = user.username;
 
         // Update last login
-        await pool.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
 
         res.json({
             message: 'Login successful!',
@@ -324,7 +314,7 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
 
     try {
         const countSql = `SELECT COUNT(*) AS total_count FROM cats${whereClause}`;
-        const [countRows] = await pool.execute(countSql, params);
+        const [countRows] = await pool.query(countSql, params);
 
         responseData.totalCount = countRows[0].total_count;
         responseData.totalPages = Math.ceil(responseData.totalCount / limit);
@@ -332,7 +322,7 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
         const catsSql = `SELECT * FROM cats${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
         const catsParams = [...params, limit, offset];
 
-        const [catsRows] = await pool.execute(catsSql, catsParams);
+        const [catsRows] = await pool.query(catsSql, catsParams);
         responseData.cats = catsRows;
 
         res.json(responseData);
@@ -347,7 +337,7 @@ app.get('/api/cats', isAuthenticated, async (req, res) => {
 app.get('/api/tags', isAuthenticated, async (req, res) => {
     try {
         const sql = `SELECT DISTINCT tag FROM cats WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC`;
-        const [tagRows] = await pool.execute(sql);
+        const [tagRows] = await pool.query(sql);
         res.json(tagRows);
 
     } catch (err) {
@@ -385,7 +375,7 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
         if (!imageUrl) { imageUrl = '/placeholder.jpg'; }
 
         const sql = 'INSERT INTO cats (name, tag, descreption, img, user_id) VALUES (?, ?, ?, ?, ?)';
-        const [result] = await pool.execute(sql, [name, tag, descreption, imageUrl, req.session.userId]);
+        const [result] = await pool.query(sql, [name, tag, descreption, imageUrl, req.session.userId]);
 
         res.status(201).json({ message: 'Cat successfully created.', id: result.insertId });
 
@@ -421,7 +411,7 @@ app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
         console.log('Executing SQL:', sql);
         console.log('With params:', params);
 
-        const [result] = await pool.execute(sql, params);
+        const [result] = await pool.query(sql, params);
 
         console.log('Update result:', result);
 
@@ -444,7 +434,7 @@ app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
 
     try {
         const sql = 'DELETE FROM cats WHERE id = ? AND user_id = ?';
-        const [result] = await pool.execute(sql, [id, req.session.userId]);
+        const [result] = await pool.query(sql, [id, req.session.userId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Cat not found or unauthorized.' });
@@ -468,7 +458,7 @@ app.post('/api/contact', async (req, res) => {
 
     try {
         const sql = 'INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())';
-        await pool.execute(sql, [name, email, subject || '', message]);
+        await pool.query(sql, [name, email, subject || '', message]);
 
         res.json({ message: 'Message sent successfully! We will get back to you soon.' });
     } catch (err) {
