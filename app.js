@@ -1,13 +1,12 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
-const fetch = require('node-fetch');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
 
 const app = express();
-app.set('trust proxy', 1); // Required for Vercel/Heroku secure cookies
+app.set('trust proxy', 1); // Required for Vercel secure cookies
 const port = process.env.PORT || 3000;
 const ONE_HOUR = 1000 * 60 * 60;
 const SALT_ROUNDS = 10;
@@ -84,7 +83,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Configure session middleware
 app.use(session({
     key: 'session_cookie_name',
-    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this-in-production',
+    secret: process.env.SESSION_SECRET || 'a-very-secure-local-development-secret-key-12345',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
@@ -324,6 +323,9 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')));
 app.get('/contact', (req, res) => res.sendFile(path.join(__dirname, 'public', 'contact.html')));
 
-app.listen(port, () => console.log(`Running on port ${port}`));
+// --- Server Start ---
+if (require.main === module) {
+    app.listen(port, () => console.log(`Server running on port ${port}`));
+}
 
 module.exports = app;

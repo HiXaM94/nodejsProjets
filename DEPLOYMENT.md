@@ -1,104 +1,73 @@
-# Deploying Cats Gallery to Heroku 🚀
+# Deploying to Vercel (Production) 🚀
 
-This guide will help you deploy your Node.js application to Heroku with a MySQL database.
+This guide provides instructions for deploying your Node.js Cat Management application to **Vercel**.
 
 ## Prerequisites
+- A **GitHub**, **GitLab**, or **Bitbucket** account.
+- A **Vercel** account (sign up at [vercel.com](https://vercel.com)).
+- An external **MySQL Database** (e.g., TiDB Cloud, Aiven, or PlanetScale).
 
-1.  **Heroku Account**: Sign up at [heroku.com](https://signup.heroku.com/).
-2.  **Heroku CLI**: Install the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli).
-3.  **Git**: Ensure Git is installed and your project is a Git repository.
+---
 
-## Step 1: Login to Heroku
+## Step 1: Prepare Your External Database
+Vercel is a serverless platform, so you cannot run a local MySQL database there. You need a hosted one. 
 
-Open your terminal and run:
+1. **Create a Database**: Sign up for a free tier at [TiDB Cloud](https://tidbcloud.com/) or [Aiven](https://aiven.io/).
+2. **Get the Connection String**: It should look like this:
+   `mysql://username:password@hostname:3306/database_name`
 
-```bash
-heroku login
-```
+---
 
-## Step 2: Create a Heroku App
+## Step 2: Push Your Code to GitHub
+1. Initialize git (if not already done):
+   ```bash
+   git init
+   git add .
+   git commit -m "Prepare for Vercel deployment"
+   ```
+2. Create a repository on GitHub and push your code:
+   ```bash
+   git remote add origin https://github.com/yourusername/your-repo-name.git
+   git branch -M main
+   git push -u origin main
+   ```
 
-Create a new app on Heroku:
+---
 
-```bash
-heroku create your-app-name
-# Example: heroku create my-cats-gallery
-```
+## Step 3: Deploy to Vercel
+1. Go to your [Vercel Dashboard](https://vercel.com/dashboard).
+2. Click **Add New** > **Project**.
+3. Import your GitHub repository.
+4. **Configure Project Settings**:
+   - **Framework Preset**: Other (it will detect Node.js).
+   - **Environment Variables**: Add the following:
+     - `JAWSDB_URL`: Paste your full database connection string here.
+     - `SESSION_SECRET`: Enter a secure random string.
+     - `NODE_ENV`: set to `production`.
+5. Click **Deploy**.
 
-## Step 3: Add MySQL Database
+---
 
-We will use **JawsDB MySQL**, a popular free MySQL add-on for Heroku.
+## Step 4: Initialize the Database Tables
+After the deployment is finished and your site is live:
+1. Navigate to your app's URL + `/api/setup-db` (e.g., `https://nodejs-projets-n8nt.vercel.app//api/setup-db`).
+2. You should see a message saying **"Database Setup Complete! ✅"**.
+3. (Optional) Navigate to `/api/update-schema` to ensure all latest columns are added.
 
-```bash
-heroku addons:create jawsdb:kite
-```
+---
 
-*Note: `kite` is the free tier plan.*
+## Step 5: Verify Your Deployment
+1. Visit your homepage.
+2. Sign up for a new account.
+3. Try adding a cat! 🐾
 
-## Step 4: Configure Environment Variables
-
-Set your session secret (use a long random string):
-
-```bash
-heroku config:set SESSION_SECRET=your_secure_random_string_here
-heroku config:set NODE_ENV=production
-```
-
-## Step 5: Deploy Your Code
-
-1.  Initialize Git (if not already done):
-    ```bash
-    git init
-    git add .
-    git commit -m "Initial commit"
-    ```
-
-2.  Deploy to Heroku:
-    ```bash
-    git push heroku master
-    # OR if your branch is main:
-    git push heroku main
-    ```
-
-## Step 6: Set Up the Database Tables
-
-Since Heroku is a fresh environment, you need to create the tables there.
-
-1.  Get your JawsDB connection string:
-    ```bash
-    heroku config:get JAWSDB_URL
-    ```
-    *It will look like: `mysql://user:password@host:port/database`*
-
-2.  Connect to the remote database using your local MySQL client or a tool like MySQL Workbench / DBeaver using the credentials from the URL.
-
-3.  Run the SQL commands from `database_setup.sql` to create the `users`, `cats`, and `contact_messages` tables.
-
-    **Alternatively**, you can use the Heroku CLI to run the SQL (if you have mysql installed locally):
-
-    ```bash
-    # Parse the JAWSDB_URL to get credentials
-    # mysql -h <host> -u <user> -p<password> <database> < database_setup.sql
-    ```
-
-## Step 7: Open Your App
-
-```bash
-heroku open
-```
+---
 
 ## Troubleshooting
+- **500 Internal Server Error**: Check the **Function Logs** in the Vercel dashboard. This usually means the database connection string is incorrect or the database is rejecting the connection.
+- **Unauthorized Errors**: Ensure your `SESSION_SECRET` is set and that you are accessing the site via `https`.
+- **Database Connection**: Your `app.js` is already configured to use SSL for TiDB Cloud (`rejectUnauthorized: true`). Check if your database provider requires specific SSL settings.
 
--   **Check Logs**: If something goes wrong, check the logs:
-    ```bash
-    heroku logs --tail
-    ```
--   **Database Connection**: Ensure `JAWSDB_URL` is set correctly in Heroku Config Vars.
--   **Port**: Ensure your app listens on `process.env.PORT` (already configured in `app.js`).
+---
 
-## Notes
-
--   **Images**: Currently, cat images are stored as URLs. If you implement file uploads later, you'll need cloud storage like AWS S3 or Cloudinary, as Heroku's filesystem is ephemeral (files are deleted on restart).
--   **Session Store**: For production, it's recommended to use a database-backed session store (like `connect-session-sequelize` or `connect-redis`) instead of the default MemoryStore, to prevent memory leaks and keep users logged in across restarts.
-
-Enjoy your deployed Cats Gallery! 🐱
+**Happy Deploying!** 🐱✨
