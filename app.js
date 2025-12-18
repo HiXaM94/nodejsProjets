@@ -20,20 +20,11 @@ function getPool() {
     let dbConfig;
 
     if (process.env.JAWSDB_URL) {
-        console.log('Using JAWSDB_URL environment variable...');
-
-        // Use the URI string directly as it's the most robust way
-        // and add SSL settings only if it looks like TiDB (contains .root)
-        if (process.env.JAWSDB_URL.includes('.root')) {
-            dbConfig = {
-                uri: process.env.JAWSDB_URL,
-                ssl: {
-                    rejectUnauthorized: false // Skip CA verification for better compatibility with serverless
-                }
-            };
-        } else {
-            dbConfig = process.env.JAWSDB_URL;
-        }
+        console.log('Using JAWSDB_URL connection string...');
+        // For mysql2, we can pass the connection string directly.
+        // If it's TiDB (.root), we ensure SSL is used. 
+        // Most TiDB strings already include ?ssl=true or similar.
+        dbConfig = process.env.JAWSDB_URL;
     } else {
         // Local Development
         dbConfig = {
