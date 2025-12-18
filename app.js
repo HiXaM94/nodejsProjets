@@ -175,13 +175,18 @@ app.post('/api/auth/register', async (req, res) => {
     const { username, password, email } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
     try {
+        console.log('Attempting to register user:', username);
         const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
         if (existingUsers.length > 0) return res.status(409).json({ error: 'Username already exists.' });
+
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
         const [result] = await pool.query('INSERT INTO users (username, password, email) VALUES (?, ?, ?)', [username, hashedPassword, email || null]);
+
+        console.log('User registered successfully:', result.insertId);
         res.status(201).json({ message: 'User registered successfully!' });
     } catch (err) {
-        res.status(500).json({ error: 'Error registering user.' });
+        console.error('Registration error details:', err);
+        res.status(500).json({ error: 'Error registering user.', details: err.message });
     }
 });
 
