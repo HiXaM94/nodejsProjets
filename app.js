@@ -20,25 +20,18 @@ function getPool() {
     let dbConfig;
 
     if (process.env.JAWSDB_URL) {
-        // Parse the URL to ensure SSL is handled correctly for TiDB/Vercel
-        try {
-            const dbUrl = new URL(process.env.JAWSDB_URL);
+        console.log('Using JAWSDB_URL environment variable...');
+
+        // Use the URI string directly as it's the most robust way
+        // and add SSL settings only if it looks like TiDB (contains .root)
+        if (process.env.JAWSDB_URL.includes('.root')) {
             dbConfig = {
-                host: dbUrl.hostname,
-                user: dbUrl.username,
-                password: dbUrl.password,
-                database: dbUrl.pathname.substr(1),
-                port: dbUrl.port || 3306,
-                waitForConnections: true,
-                connectionLimit: 10,
-                queueLimit: 0,
+                uri: process.env.JAWSDB_URL,
                 ssl: {
-                    rejectUnauthorized: true // Required for TiDB Cloud
+                    rejectUnauthorized: false // Skip CA verification for better compatibility with serverless
                 }
             };
-            console.log('Using parsed Database URL config');
-        } catch (e) {
-            console.error('Error parsing JAWSDB_URL, falling back to string:', e);
+        } else {
             dbConfig = process.env.JAWSDB_URL;
         }
     } else {
@@ -57,9 +50,9 @@ function getPool() {
     console.log('Initializing database connection...');
     try {
         pool = mysql.createPool(dbConfig);
-        console.log('Database pool created');
+        console.log('Database pool created successfully');
     } catch (err) {
-        console.error('Error creating database pool:', err);
+        console.error('CRITICAL: Error creating database pool:', err.message);
     }
     return pool;
 }
