@@ -21,10 +21,40 @@ function getPool() {
 
     if (process.env.JAWSDB_URL) {
         console.log('Using JAWSDB_URL connection string...');
-        // For mysql2, we can pass the connection string directly.
-        // If it's TiDB (.root), we ensure SSL is used. 
-        // Most TiDB strings already include ?ssl=true or similar.
-        dbConfig = process.env.JAWSDB_URL;
+
+        // Parse the connection string to add SSL for TiDB Cloud
+        const connectionString = process.env.JAWSDB_URL;
+
+        // Check if it's a TiDB Cloud connection (contains .tidbcloud.com or gateway01)
+        const isTiDB = connectionString.includes('.tidbcloud.com') ||
+            connectionString.includes('gateway01') ||
+            connectionString.includes('.root');
+
+        if (isTiDB) {
+            console.log('TiDB Cloud detected - enabling SSL...');
+            // For TiDB Cloud, we need to parse and add SSL options
+            const url = new URL(connectionString.replace('mysql://', 'http://'));
+
+            dbConfig = {
+                host: url.hostname,
+                port: url.port || 4000,
+                user: url.username,
+                password: url.password,
+                database: url.pathname.substring(1), // Remove leading /
+                ssl: {
+                    minVersion: 'TLSv1.2',
+                    rejectUnauthorized: true
+                },
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0,
+                enableKeepAlive: true,
+                keepAliveInitialDelay: 0
+            };
+        } else {
+            // For other MySQL services, use connection string directly
+            dbConfig = connectionString;
+        }
     } else {
         // Local Development
         dbConfig = {
