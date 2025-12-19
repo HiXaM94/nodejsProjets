@@ -34,8 +34,8 @@ function getPool() {
             console.log('TiDB Cloud detected - enabling SSL...');
 
             // Manual parsing for TiDB Cloud connection strings
-            // Format: mysql://username:password@host:port/database
-            const match = connectionString.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+            // Format: mysql://username:password@host:port/database or mysql://username:password@host:port/database?params
+            const match = connectionString.match(/mysql:\/\/([^:]+):([^@]+)@([^:\/]+):(\d+)\/([^?]+)/);
 
             if (match) {
                 const [, username, password, host, port, database] = match;
@@ -57,9 +57,9 @@ function getPool() {
                     keepAliveInitialDelay: 0
                 };
 
-                console.log(`Connecting to TiDB: ${host}:${port} as ${username}`);
+                console.log(`✓ TiDB Config: host=${host}, port=${port}, user=${username}, db=${database}`);
             } else {
-                console.error('Failed to parse TiDB connection string');
+                console.error('❌ Failed to parse TiDB connection string');
                 dbConfig = connectionString;
             }
         } else {
@@ -182,6 +182,34 @@ app.get('/api/setup-db', async (req, res) => {
     } catch (err) {
         console.error('Setup error:', err);
         res.status(500).send(`<h1>Setup Failed ❌</h1><p>Error: ${err.message}</p>`);
+    }
+});
+
+// --- DIAGNOSTIC ROUTE (for debugging connection issues) ---
+app.get('/api/db-check', async (req, res) => {
+    try {
+        const hasJawsDB = !!process.env.JAWSDB_URL;
+        const connectionInfo = {
+            hasJawsDBURL: hasJawsDB,
+            nodeEnv: process.env.NODE_ENV,
+            timestamp: new Date().toISOString()
+        };
+
+        // Test connection
+        await pool.query('SELECT 1');
+
+        res.json({
+            status: 'OK',
+            message: 'Database connection successful',
+            ...connectionInfo
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: 'ERROR',
+            message: err.message,
+            code: err.code,
+            sqlState: err.sqlState
+        });
     }
 });
 
