@@ -50,12 +50,20 @@ function updateNavForUser(user) {
     if (!navAuth) return;
 
     navAuth.innerHTML = `
+        <button id="viewAdoptionsBtn" class="btn btn-outline view-adoptions-btn">
+            <i data-lucide="heart"></i> My Adopted Cats
+        </button>
         <div class="user-display">
             <div class="user-avatar">${user.username.charAt(0).toUpperCase()}</div>
             <span class="username">${user.username}</span>
         </div>
         <button id="logoutBtn" class="btn btn-outline">Logout</button>
     `;
+
+    const viewAdoptionsBtn = document.getElementById('viewAdoptionsBtn');
+    if (viewAdoptionsBtn) {
+        viewAdoptionsBtn.addEventListener('click', openAdoptionsModal);
+    }
 
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -379,6 +387,16 @@ function renderCats(cats) {
                 </div>
 
                 <p>${cat.descreption || 'No description provided.'}</p>
+                
+                ${currentUser ? `
+                <div class="actions" style="margin-bottom: ${canManage ? '0.75rem' : '0'};">
+                    <button class="adopt-btn" data-cat-id="${cat.id}">
+                        <i data-lucide="heart"></i> <span class="adopt-text">Adopt</span>
+                        <span class="adoption-count">0</span>
+                    </button>
+                </div>
+                ` : ''}
+                
                 ${canManage ? `
                 <div class="actions">
                     <button class="edit-btn" data-id="${cat.id}">Edit</button>
@@ -387,6 +405,16 @@ function renderCats(cats) {
                 ` : ''}
             </div>
         `;
+
+        // Add adoption button listener
+        if (currentUser) {
+            const adoptBtn = catCard.querySelector('.adopt-btn');
+            if (adoptBtn) {
+                // Fetch adoption status for this cat
+                fetchAdoptionStatus(cat.id, adoptBtn);
+                adoptBtn.addEventListener('click', () => handleAdoptClick(cat.id, adoptBtn));
+            }
+        }
 
         if (canManage) {
             catCard.querySelector('.edit-btn').addEventListener('click', () => openEditModal(cat));

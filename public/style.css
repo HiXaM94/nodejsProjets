@@ -602,6 +602,111 @@ body {
     transform: translateY(-2px);
 }
 
+/* Adoption Button Styles */
+.adopt-btn {
+    background: linear-gradient(135deg, #ec4899, #f43f5e) !important;
+    color: white !important;
+    border: none !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.adopt-btn:hover {
+    background: linear-gradient(135deg, #db2777, #e11d48) !important;
+    transform: translateY(-2px) scale(1.02);
+}
+
+.adopt-btn.adopted {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+}
+
+.adopt-btn.adopted:hover {
+    background: linear-gradient(135deg, #059669, #047857) !important;
+}
+
+.adoption-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0 0.4rem;
+    margin-left: 0.5rem;
+}
+
+/* Adopted Cats List */
+.adopted-cat-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    transition: var(--transition);
+    border: 2px solid transparent;
+}
+
+.adopted-cat-item:hover {
+    background: white;
+    border-color: var(--primary-color);
+    transform: translateX(5px);
+}
+
+.adopted-cat-img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+
+.adopted-cat-info {
+    flex: 1;
+}
+
+.adopted-cat-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-dark);
+}
+
+.adopted-cat-info p {
+    margin: 0.25rem 0;
+    color: var(--text-medium);
+    font-size: 0.9rem;
+}
+
+.unadopt-btn {
+    padding: 0.5rem 1rem;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+    align-self: center;
+}
+
+.unadopt-btn:hover {
+    background: #dc2626;
+    transform: scale(1.05);
+}
+
+.view-adoptions-btn {
+    background: linear-gradient(135deg, #ec4899, #f43f5e);
+    color: white;
+    border: none;
+    margin-left: 0.5rem;
+}
+
+.view-adoptions-btn:hover {
+    background: linear-gradient(135deg, #db2777, #e11d48);
+}
+
 /* ===== MODAL ===== */
 .modal {
     display: none;

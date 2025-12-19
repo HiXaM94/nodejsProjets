@@ -126,6 +126,17 @@ app.get('/api/setup-db', async (req, res) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS adoptions (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                cat_id INT NOT NULL,
+                adopted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (cat_id) REFERENCES cats(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_adoption (user_id, cat_id)
+            )
+        `);
         res.send('<h1>Database Setup Complete! ✅</h1><p>Tables created successfully. <a href="/">Go back to Home</a></p>');
     } catch (err) {
         console.error('Setup error:', err);
@@ -295,6 +306,75 @@ app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
     } catch (err) {
         console.error('Error deleting cat:', err);
         res.status(500).json({ error: 'Error deleting cat', details: err.message, message: 'Error deleting cat: ' + err.message });
+    }
+});
+
+// --- ADOPTION ROUTES ---
+// Adopt a cat
+app.post('/api/adoptions', isAuthenticated, async (req, res) => {
+    const { cat_id } = req.body;
+    if (!cat_id) return res.status(400).json({ error: 'cat_id is required' });
+
+    try {
+        // Check if cat exists
+        const [cats] = await pool.query('SELECT id FROM cats WHERE id = ?', [cat_id]);
+        if (cats.length === 0) return res.status(404).json({ error: 'Cat not found' });
+
+        // Try to adopt (will fail if already adopted due to UNIQUE constraint)
+        await pool.query('INSERT INTO adoptions (user_id, cat_id) VALUES (?, ?)', [req.session.userId, cat_id]);
+        res.status(201).json({ message: 'Cat adopted successfully!' });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'You have already adopted this cat' });
+        }
+        console.error('Error adopting cat:', err);
+        res.status(500).json({ error: 'Error adopting cat', details: err.message });
+    }
+});
+
+// Get user's adopted cats
+app.get('/api/adoptions', isAuthenticated, async (req, res) => {
+    try {
+        const [adoptions] = await pool.query(`
+            SELECT c.*, a.adopted_at 
+            FROM adoptions a 
+            JOIN cats c ON a.cat_id = c.id 
+            WHERE a.user_id = ? 
+            ORDER BY a.adopted_at DESC
+        `, [req.session.userId]);
+
+        res.json({ adoptions, count: adoptions.length });
+    } catch (err) {
+        console.error('Error fetching adoptions:', err);
+        res.status(500).json({ error: 'Error fetching adoptions' });
+    }
+});
+
+// Get adoption count for a specific cat
+app.get('/api/adoptions/cat/:catId', isAuthenticated, async (req, res) => {
+    try {
+        const [result] = await pool.query('SELECT COUNT(*) as count FROM adoptions WHERE cat_id = ?', [req.params.catId]);
+        const [userAdopted] = await pool.query('SELECT id FROM adoptions WHERE cat_id = ? AND user_id = ?', [req.params.catId, req.session.userId]);
+
+        res.json({
+            count: result[0].count,
+            userAdopted: userAdopted.length > 0
+        });
+    } catch (err) {
+        console.error('Error fetching adoption count:', err);
+        res.status(500).json({ error: 'Error fetching adoption count' });
+    }
+});
+
+// Unadopt a cat
+app.delete('/api/adoptions/:catId', isAuthenticated, async (req, res) => {
+    try {
+        const [result] = await pool.query('DELETE FROM adoptions WHERE cat_id = ? AND user_id = ?', [req.params.catId, req.session.userId]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Adoption not found' });
+        res.json({ message: 'Cat unadopted successfully' });
+    } catch (err) {
+        console.error('Error unadopting cat:', err);
+        res.status(500).json({ error: 'Error unadopting cat' });
     }
 });
 
