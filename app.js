@@ -32,25 +32,36 @@ function getPool() {
 
         if (isTiDB) {
             console.log('TiDB Cloud detected - enabling SSL...');
-            // For TiDB Cloud, we need to parse and add SSL options
-            const url = new URL(connectionString.replace('mysql://', 'http://'));
 
-            dbConfig = {
-                host: url.hostname,
-                port: url.port || 4000,
-                user: url.username,
-                password: url.password,
-                database: url.pathname.substring(1), // Remove leading /
-                ssl: {
-                    minVersion: 'TLSv1.2',
-                    rejectUnauthorized: true
-                },
-                waitForConnections: true,
-                connectionLimit: 10,
-                queueLimit: 0,
-                enableKeepAlive: true,
-                keepAliveInitialDelay: 0
-            };
+            // Manual parsing for TiDB Cloud connection strings
+            // Format: mysql://username:password@host:port/database
+            const match = connectionString.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+
+            if (match) {
+                const [, username, password, host, port, database] = match;
+
+                dbConfig = {
+                    host: host,
+                    port: parseInt(port) || 4000,
+                    user: username,
+                    password: password,
+                    database: database,
+                    ssl: {
+                        minVersion: 'TLSv1.2',
+                        rejectUnauthorized: true
+                    },
+                    waitForConnections: true,
+                    connectionLimit: 10,
+                    queueLimit: 0,
+                    enableKeepAlive: true,
+                    keepAliveInitialDelay: 0
+                };
+
+                console.log(`Connecting to TiDB: ${host}:${port} as ${username}`);
+            } else {
+                console.error('Failed to parse TiDB connection string');
+                dbConfig = connectionString;
+            }
         } else {
             // For other MySQL services, use connection string directly
             dbConfig = connectionString;
