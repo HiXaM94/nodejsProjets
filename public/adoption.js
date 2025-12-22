@@ -44,7 +44,7 @@ async function handleAdoptClick(catId, adoptBtn) {
                 fetchAdoptionStatus(catId, adoptBtn);
             } else {
                 const data = await response.json();
-                alert(data.error || 'Failed to unadopt cat');
+                Popup.error(data.error || 'Failed to unadopt cat');
             }
         } else {
             // Adopt
@@ -63,42 +63,19 @@ async function handleAdoptClick(catId, adoptBtn) {
                 fetchAdoptionStatus(catId, adoptBtn);
 
                 // Show success message
-                showAdoptionMessage('Cat adopted successfully! 🎉');
+                Popup.toast('Cat adopted successfully! 🎉', 'success');
             } else {
                 const data = await response.json();
-                alert(data.error || 'Failed to adopt cat');
+                Popup.error(data.error || 'Failed to adopt cat');
             }
         }
     } catch (error) {
         console.error('Error handling adoption:', error);
-        alert('Network error. Please try again.');
+        Popup.error('Network error. Please try again.');
     }
 }
 
-// Show adoption success message
-function showAdoptionMessage(message) {
-    const messageDiv = document.createElement('div');
-    messageDiv.style.cssText = `
-        position: fixed;
-        top: 100px;
-        right: 20px;
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        z-index: 3000;
-        animation: slideInRight 0.3s ease;
-        font-weight: 600;
-    `;
-    messageDiv.textContent = message;
-    document.body.appendChild(messageDiv);
 
-    setTimeout(() => {
-        messageDiv.style.animation = 'slideOutRight 0.3s ease';
-        setTimeout(() => messageDiv.remove(), 300);
-    }, 3000);
-}
 
 // Open adoptions modal
 async function openAdoptionsModal() {
@@ -149,7 +126,7 @@ async function openAdoptionsModal() {
         adoptionsList.querySelectorAll('.unadopt-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const catId = e.target.dataset.catId;
-                if (confirm('Are you sure you want to remove this cat from your adopted list?')) {
+                if (await Popup.confirm('Are you sure you want to remove this cat from your adopted list?', 'Unadopt Cat')) {
                     await handleUnadopt(catId);
                     openAdoptionsModal(); // Refresh the list
                     fetchCats(); // Refresh the gallery to update buttons
@@ -187,36 +164,14 @@ async function handleUnadopt(catId) {
 
         if (!response.ok) {
             const data = await response.json();
-            alert(data.error || 'Failed to remove cat');
+            Popup.error(data.error || 'Failed to remove cat');
+        } else {
+            Popup.toast('Cat removed from adoption list', 'success');
         }
     } catch (error) {
         console.error('Error removing cat:', error);
-        alert('Network error. Please try again.');
+        Popup.error('Network error. Please try again.');
     }
 }
 
-// Add CSS animation for messages
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from {
-            transform: translateX(400px);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    @keyframes slideOutRight {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(400px);
-            opacity: 0;
-        }
-    }
-`;
-document.head.appendChild(style);
+

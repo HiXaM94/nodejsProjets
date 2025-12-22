@@ -211,7 +211,7 @@ async function handleLogout() {
         }
     } catch (error) {
         console.error('Logout error:', error);
-        alert('Error logging out. Please try again.');
+        Popup.error('Error logging out. Please try again.');
     }
 }
 

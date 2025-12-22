@@ -247,7 +247,7 @@ async function handleLogout() {
         }
     } catch (error) {
         console.error('Logout error:', error);
-        alert('Error logging out. Please try again.');
+        Popup.error('Error logging out. Please try again.');
     }
 }
 
@@ -484,19 +484,20 @@ async function saveCat(event) {
             modal.style.display = 'none';
             fetchCats();
             fetchAndPopulateTags(); // Refresh tags in case a new one was added
+            Popup.toast('Cat saved successfully!', 'success');
         } else {
             const data = await response.json();
-            alert(`Error: ${data.error || 'Failed to save cat'}\nDetails: ${data.details || ''}`);
+            Popup.error(`Error: ${data.error || 'Failed to save cat'}\nDetails: ${data.details || ''}`);
         }
     } catch (error) {
         console.error('Error saving cat:', error);
-        alert('Network error. Please try again.');
+        Popup.error('Network error. Please try again.');
     }
 }
 
 // Delete cat
 async function deleteCat(id) {
-    if (!confirm('Are you sure you want to delete this cat?')) return;
+    if (!await Popup.confirm('Are you sure you want to delete this cat?', 'Delete Cat')) return;
 
     try {
         const response = await fetch(`/api/cats/${id}`, {
@@ -506,13 +507,14 @@ async function deleteCat(id) {
         if (response.ok) {
             fetchCats();
             fetchAndPopulateTags(); // Refresh tags
+            Popup.toast('Cat deleted successfully', 'success');
         } else {
             const data = await response.json().catch(() => ({}));
-            alert(`Failed to delete cat: ${data.error || 'Unauthorized or server error'}`);
+            Popup.error(`Failed to delete cat: ${data.error || 'Unauthorized or server error'}`);
         }
     } catch (error) {
         console.error('Error deleting cat:', error);
-        alert('An unexpected error occurred.');
+        Popup.error('An unexpected error occurred.');
     }
 }
 
