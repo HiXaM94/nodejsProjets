@@ -20,24 +20,71 @@ const catImgUrlInput = document.getElementById('catImgUrl');
 
 // ===== AUTHENTICATION =====
 
+// Token Management
+function getAuthToken() {
+    return localStorage.getItem('authToken');
+}
+
+function setAuthToken(token) {
+    localStorage.setItem('authToken', token);
+}
+
+function removeAuthToken() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+}
+
+// Authenticated Fetch Helper
+async function fetchWithAuth(url, options = {}) {
+    const token = getAuthToken();
+    const headers = {
+        ...options.headers
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    return fetch(url, {
+        ...options,
+        headers
+    });
+}
+
 // Check authentication status
 async function checkAuthStatus() {
-    try {
-        const response = await fetch('/api/auth/status');
-        const data = await response.json();
+    const token = getAuthToken();
 
-        if (data.authenticated) {
-            currentUser = data.user;
-            updateNavForUser(data.user);
-            showAddCatButton();
-            return data.user;
-        } else {
-            updateNavForGuest();
-            hideAddCatButton();
-            return null;
+    // If no token, we are guest
+    if (!token) {
+        updateNavForGuest();
+        hideAddCatButton();
+        return null;
+    }
+
+    try {
+        const response = await fetchWithAuth('/api/auth/status');
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.authenticated) {
+                currentUser = data.user;
+                // Update text content with username strictly to avoid XSS
+                updateNavForUser(data.user);
+                showAddCatButton();
+                return data.user;
+            }
         }
+
+        // If we get here, token is invalid or request failed
+        removeAuthToken();
+        updateNavForGuest();
+        hideAddCatButton();
+        return null;
+
     } catch (error) {
         console.error('Error checking auth status:', error);
+        removeAuthToken();
         updateNavForGuest();
         hideAddCatButton();
         return null;
@@ -146,6 +193,10 @@ function openAuthModal(mode = 'login') {
     }
 }
 
+function openRegisterModal() {
+    openAuthModal('register');
+}
+
 function closeAuthModal() {
     if (authModal) authModal.style.display = 'none';
 }
@@ -170,6 +221,13 @@ async function handleLogin(event) {
         if (response.ok) {
             messageEl.textContent = 'Login successful!';
             messageEl.className = 'message success';
+
+            // Store Token
+            if (data.token) {
+                setAuthToken(data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                currentUser = data.user;
+            }
 
             setTimeout(async () => {
                 closeAuthModal();
@@ -216,6 +274,12 @@ async function handleRegister(event) {
             messageEl.textContent = 'Registration successful! Please login.';
             messageEl.className = 'message success';
 
+            // Store token if provided (some registrations auto-login)
+            if (data.token) {
+                setAuthToken(data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+            }
+
             setTimeout(() => {
                 openAuthModal('login');
             }, 1500);
@@ -235,19 +299,29 @@ async function handleRegister(event) {
 // Handle logout
 async function handleLogout() {
     try {
-        const response = await fetch('/api/auth/logout', {
-            method: 'POST'
-        });
+        // Optional: Call logout endpoint logic
+        if (currentUser) {
+            await fetchWithAuth('/api/auth/logout', { method: 'POST' });
+        }
 
-        if (response.ok) {
-            currentUser = null;
-            updateNavForGuest();
-            hideAddCatButton();
+        removeAuthToken();
+        currentUser = null;
+        updateNavForGuest();
+        hideAddCatButton();
+
+        // Redirect or reload
+        if (window.location.pathname === '/' && gallery) {
+            fetchCats(); // Refresh gallery as guest
+        } else {
             window.location.reload();
         }
+
     } catch (error) {
         console.error('Logout error:', error);
-        Popup.error('Error logging out. Please try again.');
+        removeAuthToken();
+        currentUser = null;
+        updateNavForGuest();
+        window.location.reload();
     }
 }
 
@@ -264,7 +338,7 @@ async function fetchCats() {
     const url = `/api/cats?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(currentSearch)}&tagFilter=${encodeURIComponent(currentTagFilter)}`;
 
     try {
-        const response = await fetch(url);
+        const response = await fetchWithAuth(url);
 
         // Handle unauthorized access
         if (response.status === 401) {
@@ -474,7 +548,7 @@ async function saveCat(event) {
     const url = id ? `/api/cats/${id}` : '/api/cats';
 
     try {
-        const response = await fetch(url, {
+        const response = await fetchWithAuth(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, tag, descreption, img, age, origin, gender })
@@ -500,7 +574,7 @@ async function deleteCat(id) {
     if (!await Popup.confirm('Are you sure you want to delete this cat?', 'Delete Cat')) return;
 
     try {
-        const response = await fetch(`/api/cats/${id}`, {
+        const response = await fetchWithAuth(`/api/cats/${id}`, {
             method: 'DELETE'
         });
 

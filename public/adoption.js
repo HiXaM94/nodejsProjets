@@ -3,7 +3,7 @@
 // Fetch adoption status for a cat
 async function fetchAdoptionStatus(catId, adoptBtn) {
     try {
-        const response = await fetch(`/api/adoptions/cat/${catId}`);
+        const response = await fetchWithAuth(`/api/adoptions/cat/${catId}`);
         if (!response.ok) return;
 
         const data = await response.json();
@@ -31,7 +31,7 @@ async function handleAdoptClick(catId, adoptBtn) {
     try {
         if (isAdopted) {
             // Unadopt
-            const response = await fetch(`/api/adoptions/${catId}`, {
+            const response = await fetchWithAuth(`/api/adoptions/${catId}`, {
                 method: 'DELETE'
             });
 
@@ -48,7 +48,7 @@ async function handleAdoptClick(catId, adoptBtn) {
             }
         } else {
             // Adopt
-            const response = await fetch('/api/adoptions', {
+            const response = await fetchWithAuth('/api/adoptions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cat_id: catId })
@@ -88,7 +88,7 @@ async function openAdoptionsModal() {
     adoptionsList.innerHTML = '<p style="text-align: center; padding: 2rem;">Loading...</p>';
 
     try {
-        const response = await fetch('/api/adoptions');
+        const response = await fetchWithAuth('/api/adoptions');
         if (!response.ok) throw new Error('Failed to fetch adoptions');
 
         const data = await response.json();
@@ -158,7 +158,7 @@ function closeAdoptionsModal() {
 // Handle unadopt from modal
 async function handleUnadopt(catId) {
     try {
-        const response = await fetch(`/api/adoptions/${catId}`, {
+        const response = await fetchWithAuth(`/api/adoptions/${catId}`, {
             method: 'DELETE'
         });
 
