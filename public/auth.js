@@ -1,22 +1,54 @@
 // Shared Authentication JavaScript
-// This file handles login, registration, and session management
+// This file handles login, registration, and JWT token management
 
 let currentUser = null;
 
+// Get stored token from localStorage
+function getAuthToken() {
+    return localStorage.getItem('authToken');
+}
+
+// Store token in localStorage
+function setAuthToken(token) {
+    localStorage.setItem('authToken', token);
+}
+
+// Remove token from localStorage
+function removeAuthToken() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+}
+
 // Check authentication status on page load
 async function checkAuthStatus() {
+    const token = getAuthToken();
+
+    if (!token) {
+        updateNavForGuest();
+        return;
+    }
+
     try {
-        const response = await fetch('/api/auth/status');
+        const response = await fetch('/api/auth/status', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
         const data = await response.json();
 
-        if (data.authenticated) {
+        if (response.ok && data.authenticated) {
             currentUser = data.user;
+            localStorage.setItem('user', JSON.stringify(data.user));
             updateNavForUser(data.user);
         } else {
+            // Token is invalid or expired
+            removeAuthToken();
             updateNavForGuest();
         }
     } catch (error) {
         console.error('Error checking auth status:', error);
+        removeAuthToken();
         updateNavForGuest();
     }
 }
@@ -124,14 +156,27 @@ async function handleRegister(event) {
             messageEl.textContent = data.message;
             messageEl.className = 'message success';
 
+            // Store JWT token and user info
+            if (data.token) {
+                setAuthToken(data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                currentUser = data.user;
+            }
+
             // Clear form
             document.getElementById('registerForm').reset();
 
-            // Switch to login form after 2 seconds
+            // Close modal and update UI
             setTimeout(() => {
-                openAuthModal('login');
+                closeAuthModal();
+                updateNavForUser(data.user);
                 messageEl.textContent = '';
-            }, 2000);
+
+                // Reload if on home page to show "Add Cat" option
+                if (window.location.pathname === '/') {
+                    window.location.reload();
+                }
+            }, 1000);
         } else {
             messageEl.textContent = data.error || 'Registration failed';
             messageEl.className = 'message error';
@@ -165,7 +210,12 @@ async function handleLogin(event) {
             messageEl.textContent = data.message;
             messageEl.className = 'message success';
 
-            currentUser = data.user;
+            // Store JWT token and user info
+            if (data.token) {
+                setAuthToken(data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                currentUser = data.user;
+            }
 
             // Clear form
             document.getElementById('loginForm').reset();
@@ -194,24 +244,32 @@ async function handleLogin(event) {
 // Handle logout
 async function handleLogout() {
     try {
-        const response = await fetch('/api/auth/logout', {
+        // Call logout endpoint (optional with JWT)
+        await fetch('/api/auth/logout', {
             method: 'POST'
         });
 
-        if (response.ok) {
-            currentUser = null;
-            updateNavForGuest();
+        // Remove token from localStorage
+        removeAuthToken();
+        currentUser = null;
+        updateNavForGuest();
 
-            // Redirect to home if on a protected page
-            if (window.location.pathname !== '/' && window.location.pathname !== '/about' && window.location.pathname !== '/contact') {
-                window.location.href = '/';
-            } else if (window.location.pathname === '/') {
-                window.location.reload();
-            }
+        // Redirect to home if on a protected page
+        if (window.location.pathname !== '/' && window.location.pathname !== '/about' && window.location.pathname !== '/contact') {
+            window.location.href = '/';
+        } else if (window.location.pathname === '/') {
+            window.location.reload();
         }
     } catch (error) {
         console.error('Logout error:', error);
-        Popup.error('Error logging out. Please try again.');
+        // Still remove token even if request fails
+        removeAuthToken();
+        currentUser = null;
+        updateNavForGuest();
+
+        if (typeof Popup !== 'undefined') {
+            Popup.error('Error logging out. Please try again.');
+        }
     }
 }
 

@@ -2,14 +2,16 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const path = require('path');
 const bcrypt = require('bcrypt');
-const session = require('express-session');
-const MySQLStore = require('express-mysql-session')(session);
+const jwt = require('jsonwebtoken');
 
 const app = express();
-app.set('trust proxy', 1); // Required for Vercel secure cookies
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
-const ONE_HOUR = 1000 * 60 * 60;
 const SALT_ROUNDS = 10;
+
+// JWT Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+const JWT_EXPIRES_IN = '24h'; // Token expiration time
 
 // --- Database Configuration ---
 let pool;
@@ -92,40 +94,58 @@ function getPool() {
 // Initialize pool
 pool = getPool();
 
-// --- Session Store Configuration ---
-const sessionStore = new MySQLStore({
-    clearExpired: true,
-    checkExpirationInterval: 900000,
-    expiration: ONE_HOUR,
-    createDatabaseTable: true
-}, pool);
+// --- JWT Utility Functions ---
+const generateToken = (user) => {
+    return jwt.sign(
+        { id: user.id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN }
+    );
+};
+
+const verifyToken = (token) => {
+    try {
+        return jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+        return null;
+    }
+};
 
 // --- Middleware ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configure session middleware
-app.use(session({
-    key: 'session_cookie_name',
-    secret: process.env.SESSION_SECRET || 'a-very-secure-local-development-secret-key-12345',
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: ONE_HOUR,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+// CORS headers for JWT (if needed for cross-origin requests)
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
     }
-}));
+    next();
+});
 
 // --- Authentication Middleware ---
 const isAuthenticated = (req, res, next) => {
-    if (req.session && req.session.userId) {
-        return next();
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized. No token provided.' });
     }
-    return res.status(401).json({ error: 'Unauthorized. Please login to view this content.' });
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+        return res.status(401).json({ error: 'Unauthorized. Invalid or expired token.' });
+    }
+
+    // Attach user info to request object
+    req.user = decoded;
+    next();
 };
 
 // --- SETUP ROUTE ---
@@ -184,6 +204,7 @@ app.get('/api/setup-db', async (req, res) => {
         res.status(500).send(`<h1>Setup Failed ❌</h1><p>Error: ${err.message}</p>`);
     }
 });
+
 
 // --- DIAGNOSTIC ROUTE (for debugging connection issues) ---
 app.get('/api/db-check', async (req, res) => {
@@ -246,8 +267,16 @@ app.post('/api/auth/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
         const [result] = await pool.query('INSERT INTO users (username, password, email) VALUES (?, ?, ?)', [username, hashedPassword, email || null]);
 
+        // Generate JWT token for the new user
+        const user = { id: result.insertId, username };
+        const token = generateToken(user);
+
         console.log('User registered successfully:', result.insertId);
-        res.status(201).json({ message: 'User registered successfully!' });
+        res.status(201).json({
+            message: 'User registered successfully!',
+            token,
+            user: { id: user.id, username: user.username }
+        });
     } catch (err) {
         console.error('Registration error details:', err);
         res.status(500).json({ error: 'Error registering user.', details: err.message });
@@ -259,29 +288,56 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const [users] = await pool.query('SELECT id, username, password FROM users WHERE username = ?', [username]);
         if (users.length === 0) return res.status(401).json({ error: 'Invalid username or password.' });
+
         const user = users[0];
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) return res.status(401).json({ error: 'Invalid username or password.' });
-        req.session.userId = user.id;
-        req.session.username = user.username;
-        res.json({ message: 'Login successful!', user: { id: user.id, username: user.username } });
+
+        // Update last login time
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+
+        // Generate JWT token
+        const token = generateToken({ id: user.id, username: user.username });
+
+        res.json({
+            message: 'Login successful!',
+            token,
+            user: { id: user.id, username: user.username }
+        });
     } catch (err) {
+        console.error('Login error:', err);
         res.status(500).json({ error: 'Error during login.' });
     }
 });
 
 app.post('/api/auth/logout', (req, res) => {
-    req.session.destroy(() => {
-        res.clearCookie('session_cookie_name');
-        res.json({ message: 'Logout successful!' });
+    // With JWT, logout is handled client-side by removing the token
+    // Optionally, you could implement a token blacklist here
+    res.json({ message: 'Logout successful! Please remove the token from client.' });
+});
+
+app.get('/api/auth/status', isAuthenticated, (req, res) => {
+    // If middleware passes, user is authenticated
+    res.json({
+        authenticated: true,
+        user: { id: req.user.id, username: req.user.username }
     });
 });
 
-app.get('/api/auth/status', (req, res) => {
-    if (req.session && req.session.userId) {
-        res.json({ authenticated: true, user: { id: req.session.userId, username: req.session.username } });
+// New route to verify token without requiring authentication
+app.post('/api/auth/verify', (req, res) => {
+    const { token } = req.body;
+
+    if (!token) {
+        return res.status(400).json({ valid: false, error: 'Token is required' });
+    }
+
+    const decoded = verifyToken(token);
+
+    if (decoded) {
+        res.json({ valid: true, user: { id: decoded.id, username: decoded.username } });
     } else {
-        res.json({ authenticated: false });
+        res.json({ valid: false, error: 'Invalid or expired token' });
     }
 });
 
@@ -335,7 +391,7 @@ app.post('/api/cats', isAuthenticated, async (req, res) => {
             imageUrl = response.headers.get('location') || response.url || '/placeholder.jpg';
         }
         const sql = 'INSERT INTO cats (name, tag, descreption, img, age, origin, gender, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-        await pool.query(sql, [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.session.userId]);
+        await pool.query(sql, [name, tag, descreption, imageUrl, age || null, origin || null, gender || null, req.user.id]);
         res.status(201).json({ message: 'Cat created.' });
     } catch (err) {
         console.error('Error creating cat:', err);
@@ -352,10 +408,10 @@ app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
         // If it had no owner, this update will set the current user as the owner
         if (img) {
             sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, img = ?, age = ?, origin = ?, gender = ?, user_id = ? WHERE id = ? AND (user_id = ? OR user_id IS NULL)';
-            params = [name, tag, descreption, img, age || null, origin || null, gender || null, req.session.userId, id, req.session.userId];
+            params = [name, tag, descreption, img, age || null, origin || null, gender || null, req.user.id, id, req.user.id];
         } else {
             sql = 'UPDATE cats SET name = ?, tag = ?, descreption = ?, age = ?, origin = ?, gender = ?, user_id = ? WHERE id = ? AND (user_id = ? OR user_id IS NULL)';
-            params = [name, tag, descreption, age || null, origin || null, gender || null, req.session.userId, id, req.session.userId];
+            params = [name, tag, descreption, age || null, origin || null, gender || null, req.user.id, id, req.user.id];
         }
         const [result] = await pool.query(sql, params);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Unauthorized or cat not found', message: 'Unauthorized or cat not found' });
@@ -369,7 +425,7 @@ app.put('/api/cats/:id', isAuthenticated, async (req, res) => {
 app.delete('/api/cats/:id', isAuthenticated, async (req, res) => {
     try {
         // Allow delete if owner OR if no owner exists (legacy)
-        const [result] = await pool.query('DELETE FROM cats WHERE id = ? AND (user_id = ? OR user_id IS NULL)', [req.params.id, req.session.userId]);
+        const [result] = await pool.query('DELETE FROM cats WHERE id = ? AND (user_id = ? OR user_id IS NULL)', [req.params.id, req.user.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Unauthorized or cat not found', message: 'Unauthorized or cat not found' });
         res.json({ message: 'Cat deleted.' });
     } catch (err) {
@@ -390,7 +446,7 @@ app.post('/api/adoptions', isAuthenticated, async (req, res) => {
         if (cats.length === 0) return res.status(404).json({ error: 'Cat not found' });
 
         // Try to adopt (will fail if already adopted due to UNIQUE constraint)
-        await pool.query('INSERT INTO adoptions (user_id, cat_id) VALUES (?, ?)', [req.session.userId, cat_id]);
+        await pool.query('INSERT INTO adoptions (user_id, cat_id) VALUES (?, ?)', [req.user.id, cat_id]);
         res.status(201).json({ message: 'Cat adopted successfully!' });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -410,7 +466,7 @@ app.get('/api/adoptions', isAuthenticated, async (req, res) => {
             JOIN cats c ON a.cat_id = c.id 
             WHERE a.user_id = ? 
             ORDER BY a.adopted_at DESC
-        `, [req.session.userId]);
+        `, [req.user.id]);
 
         res.json({ adoptions, count: adoptions.length });
     } catch (err) {
@@ -423,7 +479,7 @@ app.get('/api/adoptions', isAuthenticated, async (req, res) => {
 app.get('/api/adoptions/cat/:catId', isAuthenticated, async (req, res) => {
     try {
         const [result] = await pool.query('SELECT COUNT(*) as count FROM adoptions WHERE cat_id = ?', [req.params.catId]);
-        const [userAdopted] = await pool.query('SELECT id FROM adoptions WHERE cat_id = ? AND user_id = ?', [req.params.catId, req.session.userId]);
+        const [userAdopted] = await pool.query('SELECT id FROM adoptions WHERE cat_id = ? AND user_id = ?', [req.params.catId, req.user.id]);
 
         res.json({
             count: result[0].count,
@@ -438,7 +494,7 @@ app.get('/api/adoptions/cat/:catId', isAuthenticated, async (req, res) => {
 // Unadopt a cat
 app.delete('/api/adoptions/:catId', isAuthenticated, async (req, res) => {
     try {
-        const [result] = await pool.query('DELETE FROM adoptions WHERE cat_id = ? AND user_id = ?', [req.params.catId, req.session.userId]);
+        const [result] = await pool.query('DELETE FROM adoptions WHERE cat_id = ? AND user_id = ?', [req.params.catId, req.user.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Adoption not found' });
         res.json({ message: 'Cat unadopted successfully' });
     } catch (err) {
